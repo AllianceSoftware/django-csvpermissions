@@ -1,10 +1,13 @@
 #!/bin/bash
 set -o errexit
 set -o pipefail
+set -o xtrace
+
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 args=("$@")
+
 
 # TOX_ENV_RE is set on CI to filter the deafult environment list
 if [[ $TOX_ENV_RE != "" ]] ; then

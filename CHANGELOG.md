@@ -26,8 +26,7 @@ so make sure you follow the template
 
 -->
 
-
-## 0.1 2020-11-25
+## 0.0.1 2020-11-25
 
 ### Added
 * Alpha version

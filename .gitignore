@@ -3,4 +3,5 @@
 venv/
 .idea/
 .tox/
+dist/
 csv_permissions.egg-info/

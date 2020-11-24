@@ -22,7 +22,7 @@ else:
 
 # DB default settings
 _db_vars = {
-    'NAME': ('DB_NAME', 'alliance_django_utils'),
+    'NAME': ('DB_NAME', 'csv_permissions'),
     'HOST': ('DB_HOST', 'localhost'),
     'PORT': ('DB_PORT', '5432' if _engine == 'django.db.backends.postgresql' else '3306'),
     'USER': ('DB_USER', _os.environ.get('USER', '') if _engine == 'django.db.backends.postgresql' else None),
