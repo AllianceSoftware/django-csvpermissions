@@ -1,0 +1,6 @@
+*.pyc
+
+venv/
+.idea/
+.tox/
+csv_permissions.egg-info/

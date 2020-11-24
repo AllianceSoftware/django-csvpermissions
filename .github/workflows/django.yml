@@ -1,0 +1,66 @@
+name: Django CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # the combinations can run in parallel by adjusting this value
+      max-parallel: 2
+      # all combinations of the matrix choices below are combined to create jobs. The max combinations is 256
+      matrix:
+        python-version: ['38']
+        django-version: ['22']
+        database-type: ['postgresql']
+
+    services:
+
+      postgresql:
+        # Docker Hub image
+        image: postgres
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          # Maps tcp port 5432 on service container to the host
+          - 5432:5432
+        env:
+          # Override Django DB settings
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_HOST: localhost
+
+    steps:
+      # Downloads a copy of the code in the repository before running CI tests
+      - name: Check out repository code
+        uses: actions/checkout@v2
+
+      # Setup the next version of python in the versions matrix
+      - name: Set up Python 3.8
+        if: ${{ matrix.python-version == '38' }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+
+      - name: Install Python Packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install tox tox-factor
+
+      # postgres tests
+      - name: Run PostgreSQL Tests (py${{ matrix.python-version }}/django${{ matrix.django-version }})
+        if: ${{ matrix.database-type == 'postgresql' }}
+        run: bin/runtests.sh
+        env:
+          CI_SERVER: yes
+          TOX_ENV_RE: py${{ matrix.python-version }}-django${{ matrix.django-version }}-.*postgres
+          DB_HOST: localhost
+          DB_PORT: ${{ job.services.postgresql.ports[5432] }}
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: postgres
