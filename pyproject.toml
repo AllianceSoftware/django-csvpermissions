@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "csv_permissions"
-version = "0.0.1"
+version = "0.1.0"
 description = "CSV Based Permissions Module for Django"
 authors = ["Alliance Software <support@alliancesoftware.com.au>"]
 license = "BSD-2-Clause"
