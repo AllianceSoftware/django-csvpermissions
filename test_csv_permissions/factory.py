@@ -1,7 +1,8 @@
 import factory
-from authtools.models import User
 
-from test_csv_permissions.models import CustomerProfile, StaffProfile
+from test_csv_permissions.models import CustomerProfile
+from test_csv_permissions.models import StaffProfile
+from test_csv_permissions.models import User
 
 
 class UserFactory(factory.django.DjangoModelFactory):

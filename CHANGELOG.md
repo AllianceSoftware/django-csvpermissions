@@ -29,6 +29,7 @@ so make sure you follow the template
 ## 0.2.0.dev0 2021-07-xx
 
 ### Added
+* Add support for django 3.2
 * Add explicit support for python 3.6-3.9
 
 ## 0.1.0 2020-11-25

@@ -37,7 +37,6 @@ DATABASES = {'default': _db_vars}
 
 INSTALLED_APPS = (
     'csv_permissions',
-    'authtools',
 
     'test_csv_permissions',
 
@@ -46,7 +45,7 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
 )
 
-AUTH_USER_MODEL = 'authtools.User'
+AUTH_USER_MODEL = 'test_csv_permissions.User'
 
 AUTHENTICATION_BACKENDS = [
     "csv_permissions.permissions.CSVPermissionsBackend",
