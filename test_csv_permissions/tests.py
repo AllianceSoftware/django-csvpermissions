@@ -315,7 +315,7 @@ class CsvRulesTests(TestCase):
                 "All function should have been called once",
             )
 
-            test_obj = apps.get_model("test_csv_permissions", "TestModelA").objects.create()
+            test_obj = TestModelA.objects.create()
             self.assertTrue(
                 user.has_perm("test_csv_permissions.detail_testmodela", test_obj),
                 "User should have access to all objects",
@@ -351,7 +351,7 @@ class CsvRulesTests(TestCase):
                 "Yes function should have been called once",
             )
 
-            test_obj = apps.get_model("test_csv_permissions", "TestModelD").objects.create()
+            test_obj = TestModelD.objects.create()
             with self.assertRaises(RuntimeError):
                 user.has_perm("test_csv_permissions.list_testmodeld", test_obj)
 
@@ -385,7 +385,7 @@ class CsvRulesTests(TestCase):
                 "No function should have been called once",
             )
 
-            test_obj = apps.get_model("test_csv_permissions", "TestModelD").objects.create()
+            test_obj = TestModelD.objects.create()
             self.assertFalse(
                 user.has_perm("test_csv_permissions.list_testmodeld", test_obj),
                 "User should not have access with no object",
@@ -420,7 +420,7 @@ class CsvRulesTests(TestCase):
                 "Own function should have been called once",
             )
 
-            test_obj = apps.get_model("test_csv_permissions", "TestModelA").objects.create()
+            test_obj = TestModelA.objects.create()
             self.assertTrue(
                 user.has_perm("test_csv_permissions.detail_testmodela", test_obj),
                 "User should have access to all objects",
@@ -456,7 +456,7 @@ class CsvRulesTests(TestCase):
                 "Custom function should have been called once",
             )
 
-            test_obj = apps.get_model("test_csv_permissions", "TestModelE").objects.create()
+            test_obj = TestModelE.objects.create()
             self.assertFalse(
                 user.has_perm("test_csv_permissions.change_testmodele", test_obj),
                 "User should not have access to a specific object",
