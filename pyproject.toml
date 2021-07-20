@@ -19,12 +19,10 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = ">=3.6,<4.0"
 
-# the only hard dependency is django; everything else is only required
-# if you use functions/classes that require them
+# the only hard dependency is django
 Django = ">=2.2"
-isort = ">=4"
 
 [tool.poetry.dev-dependencies]
 tox = "*"
@@ -32,8 +30,11 @@ tox-factor = "*"
 isort = ">=5"
 Django = "^2.2"
 
-# requirements-tox.ini contains extra
+factory-boy = ">=3"
+# django 2.2 is incompatible with psycopg2 >=2.9
+psycopg2 = "<2.9"
 
+dataclasses = "*; python_version <= 3.6"
 
 [build-system]
 requires = ["poetry-core>=1.0.0a5"]

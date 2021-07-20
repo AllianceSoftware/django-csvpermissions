@@ -1,0 +1,7 @@
+# depenendencies needed inside each tox environment
+
+factory-boy>=3
+# pscopg2 >= 2.9 is not compatible with django 2.2
+psycopg2<2.9
+
+dataclasses; python_version >= '3.6' and python_version < '3.7'

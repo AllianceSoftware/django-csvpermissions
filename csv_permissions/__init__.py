@@ -1,6 +1,10 @@
 import unittest
 
-default_app_config = 'csv_permissions.apps.CsvPermissionAppConfig'
+import django
+
+if django.VERSION < (3, 2):
+  default_app_config = 'csv_permissions.apps.CsvPermissionAppConfig'
+
 
 def load_tests(*args, **kwargs):
   empty_suite = unittest.TestSuite()
