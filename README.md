@@ -115,6 +115,15 @@ print(
 )
 ```
 
+### Unrecognised Permissions
+
+If `settings.CSV_PERMISSIONS_STRICT` is true then querying a permission
+(or `user_type`) that is not in the CSV will raise a `LookupError`.
+
+This is not set by default as it prevents the ability to use multiple
+authentication backends for permission checks. If you are using `csv_permissions`
+exclusively for permission checks then it can be helpful to catch typos.
+
 ### Permission names
 
 By default `csv_permissions` will use the same permission name format as django: `<app label>.<action>_<model>`

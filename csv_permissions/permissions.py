@@ -360,9 +360,19 @@ class CSVPermissionsBackend:
             return False
 
         try:
-            func = self.permission_lookup[perm][user_type]
+            perm_lookup = self.permission_lookup[perm]
         except KeyError:
-            # Permission or group doesn't exist in CSV
+            # Permission doesn't exist in CSV
+            if getattr(settings, "CSV_PERMISSIONS_STRICT", False):
+                raise ValueError(f"Permission {perm} is not known")
+            return None
+
+        try:
+            func = perm_lookup[user_type]
+        except KeyError:
+            # user_type doesn't exist in CSV
+            if getattr(settings, "CSV_PERMISSIONS_STRICT", False):
+                raise ValueError(f"Permission {perm} is not known")
             return None
 
         return func(user, obj)

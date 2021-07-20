@@ -50,7 +50,7 @@ def custom_resolve_rule_name(app_config: AppConfig, model: Type[Model], action: 
     return rule_name
 
 
-@override_settings(CSV_PERMISSIONS_RESOLVE_RULE_NAME=None)
+@override_settings(CSV_PERMISSIONS_STRICT=True)
 class CsvRulesTests(TestCase):
     def test_permissions_parse(self):
         """
@@ -182,9 +182,15 @@ class CsvRulesTests(TestCase):
         """.strip()
 
         with self.assertWarnsRegex(UserWarning, r"No implementation of testmodela_own"):
-            with override_csv_permissions(csv_data):
-                user = USER1_FACTORY(email="user@localhost.test")
-                self.assertEqual(user.has_perm("test_csv_permissions.nonexistentperm_detail"), False)
+            user = USER1_FACTORY(email="user@localhost.test")
+            with override_csv_permissions([csv_data]):
+
+                with override_settings(CSV_PERMISSIONS_STRICT=False):
+                    self.assertEqual(user.has_perm("test_csv_permissions.nonexistentperm_detail"), False)
+
+                with override_settings(CSV_PERMISSIONS_STRICT=True):
+                    with self.assertRaises(LookupError):
+                        user.has_perm("test_csv_permissions.nonexistentperm_detail")
 
     def test_empty_file_permission_error(self):
         csv_data = f"""
@@ -217,7 +223,13 @@ class CsvRulesTests(TestCase):
             # If user type (group) is not recognised, then just return False
             # This allows it to play nicely with different backends
             # Down the track we might add the option to raise a warning
-            self.assertFalse(user2.has_perm("test_csv_permissions.approve_testmodela", None))
+
+            with override_settings(CSV_PERMISSIONS_STRICT=True):
+                with self.assertRaises(LookupError):
+                    user2.has_perm("test_csv_permissions.approve_testmodela", None)
+
+            with override_settings(CSV_PERMISSIONS_STRICT=False):
+                self.assertFalse(user2.has_perm("test_csv_permissions.approve_testmodela", None))
 
     def test_bad_model_type_error(self):
         """
@@ -237,6 +249,7 @@ class CsvRulesTests(TestCase):
                 # Down the track we might add the option to raise a warning
                 user.has_perm("test_csv_permissions.testmodelx_approve", None)
 
+    @override_settings(CSV_PERMISSIONS_STRICT=False)
     def test_ignored_lines(self):
         """
         Test that commented out lines are ignored
@@ -468,6 +481,7 @@ class CsvRulesTests(TestCase):
                 "Custom function should have been called twice",
             )
 
+    @override_settings(CSV_PERMISSIONS_STRICT=False)
     def test_resolve_rule_name(self):
         csv_data = f"""
         Model,      App,                  Action,   Is Global,  {USER2_TYPE},
