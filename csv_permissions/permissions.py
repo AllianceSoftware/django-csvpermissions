@@ -32,7 +32,7 @@ PermName = str
 UserType = str
 
 # function to resolve a permission name
-ResolveRuleNameFunc = Callable[[AppConfig, Type[Model], str, bool], str]
+ResolvePermNameFunc = Callable[[AppConfig, Type[Model], str, bool], str]
 
 #TODO: don't hardcode this
 # mapping of predefined actions to is_global
@@ -151,15 +151,15 @@ def _resolve_function(
         return custom_function
 
 
-def _default_resolve_rule_name(
+def _default_resolve_permission_name(
     app_config: AppConfig, model: Type[Model], action: str, is_global: bool
 ) -> str:
     if model:
         default_codename = django.contrib.auth.get_permission_codename(action, model._meta)
-        rule_name = f"{app_config.label}.{default_codename}"
+        permission_name = f"{app_config.label}.{default_codename}"
     else:
-        rule_name = f"{app_config.label}.{action}"
-    return rule_name
+        permission_name = f"{app_config.label}.{action}"
+    return permission_name
 
 
 # FIXME - @Levi to add doc / explanation to this. see https://gitlab.internal.alliancesoftware.com.au/alliance/template-django/-/merge_requests/150#note_91667
@@ -173,7 +173,7 @@ class PartiallyResolvedPermission:
 
 def _parse_csv(
     file_path: Path,
-    resolve_rule_name_func: ResolveRuleNameFunc,
+    resolve_permission_name_func: ResolvePermNameFunc,
 ) -> Tuple[
     Dict[PermName, bool],
     Dict[PermName, Dict[UserType, PartiallyResolvedPermission]],
@@ -197,8 +197,8 @@ def _parse_csv(
         'custom: name_of_custom_rule_function' (has permission as defined by name_of_custom_rule_function)
 
     :param file_path: Path to the CSV from which to import.
-    :param resolve_rule_name_func: function to resolve rule names (the function pointed to by
-        settings.CSV_PERMISSIONS_RESOLVE_RULE_NAME)`
+    :param resolve_permission_name_func: function to resolve permission names (the function pointed to by
+        settings.CSV_PERMISSIONS_RESOLVE_PERM_NAME)`
     :return: A tuple of three elements:
         - A dict mapping permission name to bool of whether that permission is global or not
         - A dict mapping a permission to a dict of user_types to partially resolved permission details:
@@ -255,16 +255,16 @@ def _parse_csv(
                     f" not be {is_global})"
                 )
 
-            rule_name = resolve_rule_name_func(app_config, model, action, is_global)
+            permission = resolve_permission_name_func(app_config, model, action, is_global)
 
-            if rule_name not in perm_is_global:
-                perm_is_global[rule_name] = is_global
-                perm_user_type_details[rule_name] = {}
+            if permission not in perm_is_global:
+                perm_is_global[permission] = is_global
+                perm_user_type_details[permission] = {}
 
             for user_type in user_types:
                 access_level = row[user_type]
 
-                perm_user_type_details[rule_name][user_type] = PartiallyResolvedPermission(
+                perm_user_type_details[permission][user_type] = PartiallyResolvedPermission(
                     app_config=app_config,
                     model=model,
                     action=action,
@@ -281,7 +281,7 @@ def _parse_csv(
 @lru_cache(maxsize=32)
 def _resolve_functions(
     file_paths: Tuple[Path, ...],
-    resolve_rule_name: Optional[str],
+    resolve_permission_name: Optional[str],
 ) -> Tuple[
     Dict[PermName, Dict[UserType, PermCheckCallable]],
     Dict[PermName, bool],
@@ -290,7 +290,7 @@ def _resolve_functions(
 ]:
     """
     :param file_path: Path to the CSV from which to import.
-    :resolve_rule_name: the settings.CSV_PERMISSIONS_RESOLVE_RULE_NAME setting.
+    :resolve_permission_name: the settings.CSV_PERMISSIONS_RESOLVE_PERM_NAME setting.
     :return: A tuple of:
             - dictionary mapping the permissions for each UserType to a function determining if the user has access.
             - dictionary mapping the permission to a boolean indicating whether the permission is object level or global level.
@@ -298,10 +298,10 @@ def _resolve_functions(
             - set of permissions
     """
 
-    if resolve_rule_name is None:
-        resolve_rule_name = _default_resolve_rule_name
+    if resolve_permission_name is None:
+        resolve_permission_name = _default_resolve_permission_name
     else:
-        resolve_rule_name = import_string(resolve_rule_name)
+        resolve_permission_name = import_string(resolve_permission_name)
 
 
     permission_is_global: Dict[PermName, bool] = {}
@@ -312,7 +312,7 @@ def _resolve_functions(
     permission_to_user_type_to_partially_resolved: Dict[PermName, Dict[UserType, PartiallyResolvedPermission]] = {}
 
     for file_path in file_paths:
-        file_permission_is_global, perm_user_type_details, user_types = _parse_csv(file_path, resolve_rule_name)
+        file_permission_is_global, perm_user_type_details, user_types = _parse_csv(file_path, resolve_permission_name)
 
         # merge global list of known user types/permissions
         known_user_types.update(set(user_types))
@@ -405,17 +405,36 @@ class CSVPermissionsBackend:
             permissions_paths = settings.CSV_PERMISSIONS_PATHS
         except AttributeError:
             try:
-                deprecation_message = "settings.CSV_PERMISSIONS_PATH is deprecated in favor of settings.CSV_PERMISSIONS_PATHS"
-                warnings.warn(deprecation_message, DeprecationWarning)
-                permissions_paths = (settings.CSV_PERMISSIONS_PATH,)
+                settings.CSV_PERMISSIONS_PATHS = (settings.CSV_PERMISSIONS_PATH,)
             except AttributeError:
                 raise ImproperlyConfigured("csv_permissions requires settings.CSV_PERMISSIONS_PATHS to be set")
+            else:
+                warnings.warn(
+                    "settings.CSV_PERMISSIONS_PATH is deprecated in favor of settings.CSV_PERMISSIONS_PATHS",
+                    DeprecationWarning
+                )
+                permissions_paths = settings.CSV_PERMISSIONS_PATHS
 
+        # convert to a tuple so that it's hashable and _resolve_functions() can have @lru_cache() applied
         permissions_paths = tuple(Path(p) for p in permissions_paths)
+
+        try:
+            resolve_perm_name = settings.CSV_PERMISSIONS_RESOLVE_PERM_NAME
+        except AttributeError:
+            try:
+                settings.CSV_PERMISSIONS_RESOLVE_PERM_NAME = settings.CSV_PERMISSIONS_RESOLVE_RULE_NAME
+            except AttributeError:
+                resolve_perm_name = None
+            else:
+                warnings.warn(
+                    "settings.CSV_PERMISSIONS_RESOLVE_RULE_NAME is deprecated in favor of settings.CSV_PERMISSIONS_RESOLVE_PERM_NAME",
+                    DeprecationWarning
+                )
+                resolve_perm_name = settings.CSV_PERMISSIONS_RESOLVE_RULE_NAME
 
         self.permission_lookup, self.permission_is_global, self.known_user_types, self.known_perms = _resolve_functions(
             permissions_paths,
-            getattr(settings, "CSV_PERMISSIONS_RESOLVE_RULE_NAME", None)
+            resolve_perm_name
         )
 
     def authenticate(self, request: HttpRequest, username: Optional[str] = None, password: Optional[str] = None):

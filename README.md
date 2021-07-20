@@ -128,12 +128,12 @@ exclusively for permission checks then it can be helpful to catch typos.
 
 By default `csv_permissions` will use the same permission name format as django: `<app label>.<action>_<model>`
 
-You can optionally set `settings.CSV_PERMISSIONS_RESOLVE_RULE_NAME` to the fully qualified name of a function to
+You can optionally set `settings.CSV_PERMISSIONS_RESOLVE_PERM_NAME` to the fully qualified name of a function to
 resolve permission names to whatever pattern you want.
 
 In `settings.py`:
 ```python
-CSV_PERMISSIONS_RESOLVE_RULE_NAME = 'my_site.auth.resolve_rule_name'
+CSV_PERMISSIONS_RESOLVE_PERM_NAME = 'my_site.auth.resolve_rule_name'
 ```
 
 In `my_site/auth.py`:

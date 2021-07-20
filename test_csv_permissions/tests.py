@@ -29,11 +29,11 @@ USER2_TYPE = StaffProfile.user_type
 USER2_FACTORY = lambda *args, **kwargs: StaffUserFactory.create(*args, **kwargs)  # noqa: E731
 
 
-def custom_resolve_rule_name(app_config: AppConfig, model: Type[Model], action: str, is_global: bool) -> str:
+def custom_resolve_perm_name(app_config: AppConfig, model: Type[Model], action: str, is_global: bool) -> str:
     app_label = app_config.label.upper()
     model_name = model._meta.object_name
-    rule_name = f"{app_label}/{model_name}/{action}/{is_global}"
-    return rule_name
+    perm_name = f"{app_label}/{model_name}/{action}/{is_global}"
+    return perm_name
 
 
 @override_settings(CSV_PERMISSIONS_STRICT=True)
@@ -467,7 +467,7 @@ class CsvRulesTests(TestCase):
             )
 
     @override_settings(CSV_PERMISSIONS_STRICT=False)
-    def test_resolve_rule_name(self):
+    def test_resolve_perm_name(self):
         csv_data = f"""
         Model,      App,                  Action,   Is Global,  {USER2_TYPE},
         TestModelE, test_csv_permissions, list,     yes,        yes,
@@ -481,7 +481,7 @@ class CsvRulesTests(TestCase):
             self.assertFalse(user.has_perm("test_csv_permissions.list_testmodela"))
 
             with override_settings(
-                CSV_PERMISSIONS_RESOLVE_RULE_NAME=("test_csv_permissions.tests.custom_resolve_rule_name")
+                CSV_PERMISSIONS_RESOLVE_PERM_NAME=("test_csv_permissions.tests.custom_resolve_perm_name")
             ):
                 with override_csv_permissions([csv_data]):
 

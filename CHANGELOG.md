@@ -37,6 +37,8 @@ so make sure you follow the template
 
 ### Changed
 * `CSV_PERMISSIONS_PATH` setting deprecated in favour of `CSV_PERMISSIONS_PATHS`
+* `CSV_PERMISSIONS_RESOLVE_RULE_NAME` setting deprecated in favour of `CSV_PERMISSIONS_RESOLVE_PERM_NAME`
+
 ## 0.1.0 2020-11-25
 
 ### Added
