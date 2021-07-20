@@ -33,7 +33,10 @@ so make sure you follow the template
 * Add support for django 3.2
 * Add explicit support for python 3.6-3.9
 * Add `CSV_PERMISSIONS_STRICT` setting
+* Add support for multiple CSV files
 
+### Changed
+* `CSV_PERMISSIONS_PATH` setting deprecated in favour of `CSV_PERMISSIONS_PATHS`
 ## 0.1.0 2020-11-25
 
 ### Added

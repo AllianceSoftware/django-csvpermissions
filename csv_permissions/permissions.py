@@ -1,7 +1,11 @@
 from csv import DictReader
+from typing import Iterable
+from typing import Set
+
 from dataclasses import dataclass
 from functools import lru_cache
 from functools import wraps
+from pathlib import Path
 from typing import Callable
 from typing import Dict
 from typing import Optional
@@ -13,7 +17,9 @@ from django.apps import AppConfig
 from django.apps import apps
 from django.conf import settings
 import django.contrib.auth
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Model
+from django.http import HttpRequest
 from django.utils.module_loading import import_string
 
 # a callable to check whether a has a permission for a given object
@@ -25,6 +31,10 @@ PermName = str
 # a user type
 UserType = str
 
+# function to resolve a permission name
+ResolveRuleNameFunc = Callable[[AppConfig, Type[Model], str, bool], str]
+
+#TODO: don't hardcode this
 # mapping of predefined actions to is_global
 _PREDEFINED_ACTION_IS_GLOBAL = {
     "list": True,
@@ -162,8 +172,13 @@ class PartiallyResolvedPermission:
 
 
 def _parse_csv(
-    file_path: str,
-) -> Tuple[Dict[PermName, bool], Dict[PermName, Dict[UserType, PartiallyResolvedPermission]]]:
+    file_path: Path,
+    resolve_rule_name_func: ResolveRuleNameFunc,
+) -> Tuple[
+    Dict[PermName, bool],
+    Dict[PermName, Dict[UserType, PartiallyResolvedPermission]],
+    Iterable[str],
+]:
     """
     Parses the CSV of user_type permissions returns a list of permissions for further processing.
 
@@ -182,27 +197,20 @@ def _parse_csv(
         'custom: name_of_custom_rule_function' (has permission as defined by name_of_custom_rule_function)
 
     :param file_path: Path to the CSV from which to import.
-    :return: A tuple of two elements:
-        A dict mapping permission name to bool of whether that permission is global or not
-        A dict mapping a permission to a dict of user_types to partially resolved permission details:
-
-        permission_name: {
-            user_type1: PartiallyResolvedPermission,
-            ...
-            user_typeN: PartiallyResolvedPermission,
-        }
+    :param resolve_rule_name_func: function to resolve rule names (the function pointed to by
+        settings.CSV_PERMISSIONS_RESOLVE_RULE_NAME)`
+    :return: A tuple of three elements:
+        - A dict mapping permission name to bool of whether that permission is global or not
+        - A dict mapping a permission to a dict of user_types to partially resolved permission details:
+            permission_name: {
+                user_type1: PartiallyResolvedPermission,
+                ...
+                user_typeN: PartiallyResolvedPermission,
+            }
+        - A list of user types
     """
 
-    try:
-        CSV_PERMISSIONS_RESOLVE_RULE_NAME = settings.CSV_PERMISSIONS_RESOLVE_RULE_NAME
-        if CSV_PERMISSIONS_RESOLVE_RULE_NAME is None:
-            raise AttributeError
-    except AttributeError:
-        CSV_PERMISSIONS_RESOLVE_RULE_NAME = _default_resolve_rule_name
-    else:
-        CSV_PERMISSIONS_RESOLVE_RULE_NAME = import_string(CSV_PERMISSIONS_RESOLVE_RULE_NAME)
-
-    with open(file_path, "r") as csv_file:
+    with file_path.open("r") as csv_file:
         reader = DictReader(csv_file, skipinitialspace=True)
 
         if reader.fieldnames[:4] != ["Model", "App", "Action", "Is Global"]:
@@ -247,7 +255,7 @@ def _parse_csv(
                     f" not be {is_global})"
                 )
 
-            rule_name = CSV_PERMISSIONS_RESOLVE_RULE_NAME(app_config, model, action, is_global)
+            rule_name = resolve_rule_name_func(app_config, model, action, is_global)
 
             if rule_name not in perm_is_global:
                 perm_is_global[rule_name] = is_global
@@ -266,27 +274,76 @@ def _parse_csv(
         if was_empty:
             raise RuntimeError("Empty permissions file")
 
-        return perm_is_global, perm_user_type_details
+        return perm_is_global, perm_user_type_details, user_types
 
 
 # should be at least as large as the number of CSV files we load. This gets called by every has_perm() so must be cached
 @lru_cache(maxsize=32)
 def _resolve_functions(
-    file_path: str, resolve_rule_name: str
-) -> Tuple[Dict[PermName, Dict[UserType, PermCheckCallable]], Dict[PermName, bool]]:
+    file_paths: Tuple[Path, ...],
+    resolve_rule_name: Optional[str],
+) -> Tuple[
+    Dict[PermName, Dict[UserType, PermCheckCallable]],
+    Dict[PermName, bool],
+    Set[str],
+    Set[str]
+]:
     """
     :param file_path: Path to the CSV from which to import.
-    :resolve_rule_name: the settings.CSV_PERMISSIONS_RESOLVE_RULE_NAME setting. This is not actually used but is needed for lru_cache invalidation
-    :return: A tuple of dictionaries:
-            The first maps the permissions for each UserType to a function determining if the user has access.
-            The second maps the permission to a boolean indicating whether the permission is object level or global level.
+    :resolve_rule_name: the settings.CSV_PERMISSIONS_RESOLVE_RULE_NAME setting.
+    :return: A tuple of:
+            - dictionary mapping the permissions for each UserType to a function determining if the user has access.
+            - dictionary mapping the permission to a boolean indicating whether the permission is object level or global level.
+            - set of user types
+            - set of permissions
     """
 
-    permission_is_global, perm_user_type_details = _parse_csv(file_path)
+    if resolve_rule_name is None:
+        resolve_rule_name = _default_resolve_rule_name
+    else:
+        resolve_rule_name = import_string(resolve_rule_name)
 
-    permission_to_user_type_to_function = {perm: {} for perm in permission_is_global.keys()}
-    for permission, is_global in permission_is_global.items():
-        for user_type, detail in perm_user_type_details[permission].items():
+
+    permission_is_global: Dict[PermName, bool] = {}
+
+    known_user_types: Set[UserType] = set()
+    known_perms: Set[PermName] = set()
+
+    permission_to_user_type_to_partially_resolved: Dict[PermName, Dict[UserType, PartiallyResolvedPermission]] = {}
+
+    for file_path in file_paths:
+        file_permission_is_global, perm_user_type_details, user_types = _parse_csv(file_path, resolve_rule_name)
+
+        # merge global list of known user types/permissions
+        known_user_types.update(set(user_types))
+        known_perms.update(set(file_permission_is_global.keys()))
+
+        # merge is_global settings
+        for permission, is_global in file_permission_is_global.items():
+            if permission in permission_is_global and permission_is_global[permission] != is_global:
+                raise ValueError(f"'Is Global' for {permission} in {file_path} is inconsistent with a previous CSV file")
+        permission_is_global.update(file_permission_is_global)
+
+        # merge partially resolved permissions
+        for permission, user_type_to_partially_resolved in perm_user_type_details.items():
+            if permission not in permission_to_user_type_to_partially_resolved:
+                permission_to_user_type_to_partially_resolved[permission] = {}
+            for user_type, partially_resolved in user_type_to_partially_resolved.items():
+                if user_type in permission_to_user_type_to_partially_resolved[permission]:
+                    if partially_resolved != permission_to_user_type_to_partially_resolved[permission][user_type]:
+                        raise ValueError(f"Permission {permission} for user type {user_type} in {file_path} is inconsistent with a previous CSV file")
+                else:
+                    permission_to_user_type_to_partially_resolved[permission][user_type] = partially_resolved
+
+
+    permission_to_user_type_to_function: Dict[PermName, Dict[UserType, PermCheckCallable]] = {}
+
+    # now take the partially resolved functions and resolve them
+    for permission, user_type_to_partially_resolved in permission_to_user_type_to_partially_resolved.items():
+        is_global = permission_is_global[permission]
+        if permission not in permission_to_user_type_to_function:
+            permission_to_user_type_to_function[permission] = {}
+        for user_type, detail in user_type_to_partially_resolved.items():
             access_level = detail.access_level or ""
             if detail.model is None:
                 model_name = None
@@ -333,17 +390,35 @@ def _resolve_functions(
             except RuntimeError as e:
                 raise RuntimeError(f"{e} Permission: {permission}")
 
-    return permission_to_user_type_to_function, permission_is_global
+    return permission_to_user_type_to_function, permission_is_global, known_user_types, known_perms
 
 
 # note that django creates a new instance of an auth backend for every permission check!
 class CSVPermissionsBackend:
+    permission_lookup: Dict[PermName, Dict[UserType, PermCheckCallable]]
+    permission_is_global: Dict[PermName, bool]
+    known_user_types: Set[UserType]
+    known_perms: Set[PermName]
+
     def __init__(self):
-        self.permission_lookup, self.permission_is_global = _resolve_functions(
-            settings.CSV_PERMISSIONS_PATH, settings.CSV_PERMISSIONS_RESOLVE_RULE_NAME
+        try:
+            permissions_paths = settings.CSV_PERMISSIONS_PATHS
+        except AttributeError:
+            try:
+                deprecation_message = "settings.CSV_PERMISSIONS_PATH is deprecated in favor of settings.CSV_PERMISSIONS_PATHS"
+                warnings.warn(deprecation_message, DeprecationWarning)
+                permissions_paths = (settings.CSV_PERMISSIONS_PATH,)
+            except AttributeError:
+                raise ImproperlyConfigured("csv_permissions requires settings.CSV_PERMISSIONS_PATHS to be set")
+
+        permissions_paths = tuple(Path(p) for p in permissions_paths)
+
+        self.permission_lookup, self.permission_is_global, self.known_user_types, self.known_perms = _resolve_functions(
+            permissions_paths,
+            getattr(settings, "CSV_PERMISSIONS_RESOLVE_RULE_NAME", None)
         )
 
-    def authenticate(self, request, username=None, password=None):
+    def authenticate(self, request: HttpRequest, username: Optional[str] = None, password: Optional[str] = None):
         return None
 
     def is_global_perm(self, perm: str) -> bool:
@@ -354,25 +429,28 @@ class CSVPermissionsBackend:
 
     def has_perm(self, user: Model, perm: str, obj: Model) -> bool:
         try:
+            # TODO: don't hardcode this
             user_type = str(user.get_profile().user_type)
         except AttributeError:
             # Not logged in / No user profile
             return False
 
-        try:
-            perm_lookup = self.permission_lookup[perm]
-        except KeyError:
-            # Permission doesn't exist in CSV
-            if getattr(settings, "CSV_PERMISSIONS_STRICT", False):
-                raise ValueError(f"Permission {perm} is not known")
-            return None
+        if getattr(settings, "CSV_PERMISSIONS_STRICT", False):
+            if perm not in self.known_perms:
+                raise LookupError(f"Permission {repr(perm)} is not known")
+            if user_type not in self.known_user_types:
+                raise LookupError(f"User Type {repr(user_type)} is not known")
 
         try:
-            func = perm_lookup[user_type]
+            func = self.permission_lookup[perm][user_type]
         except KeyError:
-            # user_type doesn't exist in CSV
-            if getattr(settings, "CSV_PERMISSIONS_STRICT", False):
-                raise ValueError(f"Permission {perm} is not known")
-            return None
+            # If we get here it means that
+            #  - the permission/user type is not known at all and CSV_PERMISSIONS_STRICT is not set
+            # or
+            #  - the permission & user types are known but because there are multiple CSV files that
+            #    particular combination doesn't appear in any CSV file
+            #
+            # in either case we allow django to try other backends
+            return False
 
         return func(user, obj)

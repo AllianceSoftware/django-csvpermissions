@@ -1,6 +1,3 @@
-import contextlib
-import os
-import tempfile
 from typing import Type
 from unittest.mock import patch
 
@@ -16,6 +13,10 @@ from .factory import CustomerUserFactory
 from .factory import StaffUserFactory
 from .models import CustomerProfile
 from .models import StaffProfile
+from .models import TestModelA
+from .models import TestModelD
+from .models import TestModelE
+from .test_utils import override_csv_permissions
 
 USER1_MODEL = CustomerProfile
 USER1_TYPE = CustomerProfile.user_type
@@ -26,21 +27,6 @@ USER1_FACTORY = lambda *args, **kwargs: CustomerUserFactory.create(  # noqa: E73
 USER2_MODEL = StaffProfile
 USER2_TYPE = StaffProfile.user_type
 USER2_FACTORY = lambda *args, **kwargs: StaffUserFactory.create(*args, **kwargs)  # noqa: E731
-
-
-@contextlib.contextmanager
-def override_csv_permissions(csv_data):
-    csv_file = None
-    try:
-        with tempfile.NamedTemporaryFile("w", delete=False) as csv_file:
-            csv_file.writelines(csv_data)
-
-        with override_settings(CSV_PERMISSIONS_PATH=csv_file.name):
-            yield
-
-    finally:
-        if csv_file is not None:
-            os.remove(csv_file.name)
 
 
 def custom_resolve_rule_name(app_config: AppConfig, model: Type[Model], action: str, is_global: bool) -> str:
@@ -67,7 +53,7 @@ class CsvRulesTests(TestCase):
         TestModelE, test_csv_permissions, change, no,        own: model_e,  custom: own_model_a_or_model_b,
         """.strip()
 
-        with override_csv_permissions(csv_data):
+        with override_csv_permissions([csv_data]):
             user1 = USER1_FACTORY(email="user2@localhost.test")
             user2 = USER2_FACTORY(email="user1@localhost.test")
 
@@ -141,7 +127,7 @@ class CsvRulesTests(TestCase):
         TestModelA, test_csv_permissions, detail,   yes,          all,
         """.strip()
 
-        with override_csv_permissions(csv_data):
+        with override_csv_permissions([csv_data]):
             user = USER1_FACTORY(email="user@localhost.test")
 
             with self.assertRaises(RuntimeError):
@@ -153,7 +139,7 @@ class CsvRulesTests(TestCase):
         TestModelA, test_csv_permissions, detail,   yes,        own,
         """.strip()
 
-        with override_csv_permissions(csv_data):
+        with override_csv_permissions([csv_data]):
             user = USER1_FACTORY(email="user@localhost.test")
 
             with self.assertRaises(RuntimeError):
@@ -165,7 +151,7 @@ class CsvRulesTests(TestCase):
         TestModelA, test_csv_permissions, detail,   no,         yes,
         """.strip()
 
-        with override_csv_permissions(csv_data):
+        with override_csv_permissions([csv_data]):
             user = USER1_FACTORY(email="user@localhost.test")
 
             with self.assertRaises(RuntimeError):
@@ -173,8 +159,7 @@ class CsvRulesTests(TestCase):
 
     def test_non_existent_permission_error(self):
         """
-        Test that permissions that aren't present in the file return false rather than raising an error
-        if tested against a user.
+        Test what happens when permissions aren't present in the file
         """
         csv_data = f"""
         Model,      App,                  Action,   Is Global,  {USER1_TYPE},
@@ -197,7 +182,7 @@ class CsvRulesTests(TestCase):
         Model,      App,                  Action,   Is Global,  {USER1_TYPE},
         """.strip()
 
-        with override_csv_permissions(csv_data):
+        with override_csv_permissions([csv_data]):
             user = USER1_FACTORY(email="user@localhost.test")
 
             with self.assertRaisesMessage(RuntimeError, "Empty permissions file"):
@@ -213,7 +198,7 @@ class CsvRulesTests(TestCase):
         TestModelA, test_csv_permissions, approve,  yes,        yes,
         """.strip()
 
-        with override_csv_permissions(csv_data):
+        with override_csv_permissions([csv_data]):
             user1 = USER1_FACTORY(email="user1@localhost.test")
             user2 = USER2_FACTORY(email="user2@localhost.test")
 
@@ -241,7 +226,7 @@ class CsvRulesTests(TestCase):
         """.strip()
 
         with self.assertRaises(LookupError):
-            with override_csv_permissions(csv_data):
+            with override_csv_permissions([csv_data]):
                 user = USER1_FACTORY(email="user@localhost.test")
 
                 # If group is not recognised, then just return False
@@ -261,14 +246,14 @@ class CsvRulesTests(TestCase):
         csv_bad_line = "blah blah blah"
         user = USER1_FACTORY(email="user1a@localhost.test")
 
-        with override_csv_permissions(csv_header_data + "\n" * 3 + "#" + csv_bad_line):
+        with override_csv_permissions([csv_header_data + "\n" * 3 + "#" + csv_bad_line]):
             self.assertFalse(user.has_perm("test_csv_permissions.approve_testmodela", None))
 
         with self.assertRaises(LookupError):
-            with override_csv_permissions(csv_header_data + "\n" * 3 + csv_bad_line):
+            with override_csv_permissions([csv_header_data + "\n" * 3 + csv_bad_line]):
                 self.assertFalse(user.has_perm("test_csv_permissions.approve_testmodela", None))
 
-        with override_csv_permissions(csv_header_data + "\n" * 3 + "//" + csv_bad_line):
+        with override_csv_permissions([csv_header_data + "\n" * 3 + "//" + csv_bad_line]):
             self.assertFalse(user.has_perm("test_csv_permissions.approve_testmodela", None))
 
         pass
@@ -282,7 +267,7 @@ class CsvRulesTests(TestCase):
         TestModelA, test_csv_permissions, detail,   yes,        own,
         """.strip()
 
-        with override_csv_permissions(csv_data):
+        with override_csv_permissions([csv_data]):
             user = USER1_FACTORY(email="user@localhost.test")
 
             with self.assertRaisesMessage(
@@ -300,7 +285,7 @@ class CsvRulesTests(TestCase):
         TestModelA, test_csv_permissions, list,   no,           yes,
         """.strip()
 
-        with override_csv_permissions(csv_data):
+        with override_csv_permissions([csv_data]):
             user = USER1_FACTORY(email="user@localhost.test")
 
             with self.assertRaisesMessage(RuntimeError, "Invalid action / global setting for "):
@@ -316,7 +301,7 @@ class CsvRulesTests(TestCase):
         TestModelA, test_csv_permissions, detail,   no,         all,
         """.strip()
 
-        with override_csv_permissions(csv_data):
+        with override_csv_permissions([csv_data]):
             user = USER1_FACTORY(email="user@localhost.test")
 
             with self.assertRaises(RuntimeError):
@@ -350,7 +335,7 @@ class CsvRulesTests(TestCase):
         TestModelD, test_csv_permissions, list,     yes,        yes,
         """.strip()
 
-        with override_csv_permissions(csv_data):
+        with override_csv_permissions([csv_data]):
             user = USER2_FACTORY(email="user@localhost.test")
 
             self.assertTrue(
@@ -384,7 +369,7 @@ class CsvRulesTests(TestCase):
         TestModelD, test_csv_permissions, list,     yes,        ,
         """.strip()
 
-        with override_csv_permissions(csv_data):
+        with override_csv_permissions([csv_data]):
             user = USER1_FACTORY(email="user@localhost.test")
 
             self.assertFalse(
@@ -420,7 +405,7 @@ class CsvRulesTests(TestCase):
         TestModelA, test_csv_permissions, detail,   no,         own: model_a,
         """.strip()
 
-        with override_csv_permissions(csv_data):
+        with override_csv_permissions([csv_data]):
             user = USER2_FACTORY(email="user@localhost.test")
 
             self.raises = self.assertRaises(RuntimeError)
@@ -455,7 +440,7 @@ class CsvRulesTests(TestCase):
         TestModelE, test_csv_permissions, change,   no,         custom: own_model_a_or_model_b,
         """.strip()
 
-        with override_csv_permissions(csv_data):
+        with override_csv_permissions([csv_data]):
             user = USER2_FACTORY(email="user@localhost.test")
 
             self.assertFalse(
@@ -490,7 +475,7 @@ class CsvRulesTests(TestCase):
 
         user = USER2_FACTORY(email="user@localhost.test")
 
-        with override_csv_permissions(csv_data):
+        with override_csv_permissions([csv_data]):
             # check default permission names
             self.assertTrue(user.has_perm("test_csv_permissions.list_testmodele"))
             self.assertFalse(user.has_perm("test_csv_permissions.list_testmodela"))
@@ -498,7 +483,7 @@ class CsvRulesTests(TestCase):
             with override_settings(
                 CSV_PERMISSIONS_RESOLVE_RULE_NAME=("test_csv_permissions.tests.custom_resolve_rule_name")
             ):
-                with override_csv_permissions(csv_data):
+                with override_csv_permissions([csv_data]):
 
                     # default name should not match anymore
                     self.assertFalse(user.has_perm("test_csv_permissions.list_testmodele"))
@@ -507,3 +492,77 @@ class CsvRulesTests(TestCase):
                     # custom name should match
                     self.assertTrue(user.has_perm("TEST_CSV_PERMISSIONS/TestModelE/list/True"))
                     self.assertFalse(user.has_perm("TEST_CSV_PERMISSIONS/TestModelA/list/True"))
+
+    def test_multiple_csv_files_merge(self):
+        csv_data1 = f"""
+        Model,      App,                  Action,   Is Global,  {USER1_TYPE},
+        TestModelA, test_csv_permissions, view,     no,         all,
+        TestModelB, test_csv_permissions, add,      yes,        yes,
+        """.strip()
+
+        csv_data2 = f"""
+        Model,      App,                  Action,   Is Global,  {USER2_TYPE},
+        TestModelA, test_csv_permissions, view,     no,         all,
+        TestModelC, test_csv_permissions, add,      yes,        yes,
+        """.strip()
+
+        csv_data3 = f"""
+        Model,      App,                  Action,   Is Global,  {USER1_TYPE}, {USER2_TYPE},
+        TestModelD, test_csv_permissions, add,      yes,        yes,          yes,
+        """.strip()
+
+        user1 = USER1_FACTORY(email="user1@localhost.test")
+        user2 = USER2_FACTORY(email="user2@localhost.test")
+        test_a = TestModelA.objects.create()
+
+        with override_csv_permissions([csv_data1, csv_data2, csv_data3]):
+            self.assertTrue(user1.has_perm("test_csv_permissions.view_testmodela", test_a))
+            self.assertTrue(user2.has_perm("test_csv_permissions.view_testmodela", test_a))
+
+            self.assertTrue(user1.has_perm("test_csv_permissions.add_testmodelb"))
+            self.assertFalse(user2.has_perm("test_csv_permissions.add_testmodelb"))
+
+            self.assertFalse(user1.has_perm("test_csv_permissions.add_testmodelc"))
+            self.assertTrue(user2.has_perm("test_csv_permissions.add_testmodelc"))
+
+            self.assertTrue(user1.has_perm("test_csv_permissions.add_testmodeld"))
+            self.assertTrue(user2.has_perm("test_csv_permissions.add_testmodeld"))
+
+    def test_multiple_csv_files_inconsistent_is_global(self):
+        csv_data1 = f"""
+        Model,      App,                  Action,   Is Global,  {USER1_TYPE},
+        TestModelA, test_csv_permissions, foo,      yes,         ,
+        """.strip()
+
+        csv_data2 = f"""
+        Model,      App,                  Action,   Is Global,  {USER2_TYPE},
+        TestModelA, test_csv_permissions, foo,      no,        ,
+        """.strip()
+
+        user1 = USER1_FACTORY(email="user1@localhost.test")
+
+        with self.assertRaisesRegex(ValueError, 'inconsistent with a previous CSV file'):
+            with override_csv_permissions([csv_data1, csv_data2]):
+                user1.has_perm("test_csv_permissions.foo_testmodela")
+
+    def test_multiple_csv_files_inconsistent_details(self):
+        csv_data1 = f"""
+        Model,      App,                  Action,   Is Global,  {USER1_TYPE},
+        TestModelA, test_csv_permissions, foo,      yes,         yes,
+        """.strip()
+
+        csv_data2 = f"""
+        Model,      App,                  Action,   Is Global,  {USER1_TYPE},
+        TestModelA, test_csv_permissions, foo,      yes,        no,
+        """.strip()
+
+        user1 = USER1_FACTORY(email="user1@localhost.test")
+
+        # consistent CSV files
+        with override_csv_permissions([csv_data1, csv_data1]):
+            self.assertTrue(user1.has_perm("test_csv_permissions.foo_testmodela"))
+
+        # inconsistent CSV files
+        with self.assertRaisesRegex(ValueError, 'inconsistent with a previous CSV file'):
+            with override_csv_permissions([csv_data1, csv_data2]):
+                user1.has_perm("test_csv_permissions.foo_testmodela")
