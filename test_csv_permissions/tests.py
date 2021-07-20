@@ -11,12 +11,11 @@ from django.test import override_settings
 from django.test import TestCase
 
 import csv_permissions.permissions
-from .models import CustomerProfile
-from .models import StaffProfile
-
 
 from .factory import CustomerUserFactory
 from .factory import StaffUserFactory
+from .models import CustomerProfile
+from .models import StaffProfile
 
 USER1_MODEL = CustomerProfile
 USER1_TYPE = CustomerProfile.user_type
