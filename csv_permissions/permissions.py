@@ -22,8 +22,8 @@ PermCheckCallable = Callable[[Model, Optional[Model]], bool]
 # a permission name
 PermName = str
 
-# a group name
-GroupName = str
+# a user type
+UserType = str
 
 # mapping of predefined actions to is_global
 _PREDEFINED_ACTION_IS_GLOBAL = {
@@ -163,12 +163,12 @@ class PartiallyResolvedPermission:
 
 def _parse_csv(
     file_path: str,
-) -> Tuple[Dict[PermName, bool], Dict[PermName, Dict[GroupName, PartiallyResolvedPermission]]]:
+) -> Tuple[Dict[PermName, bool], Dict[PermName, Dict[UserType, PartiallyResolvedPermission]]]:
     """
-    Parses the CSV of group permissions returns a list of permissions for further processing.
+    Parses the CSV of user_type permissions returns a list of permissions for further processing.
 
     CSV file format:
-        entity, app_name, permission_name, is_global, group1, group2, .. groupN
+        entity, app_name, permission_name, is_global, user_type1, user_type2, .. user_typeN
 
     The possible values for permissions are:
         '' (no permission)
@@ -184,12 +184,12 @@ def _parse_csv(
     :param file_path: Path to the CSV from which to import.
     :return: A tuple of two elements:
         A dict mapping permission name to bool of whether that permission is global or not
-        A dict mapping a permission to a dict of group names to partially resolved permission details:
+        A dict mapping a permission to a dict of user_types to partially resolved permission details:
 
         permission_name: {
-            group1: PartiallyResolvedPermission,
+            user_type1: PartiallyResolvedPermission,
             ...
-            groupN: PartiallyResolvedPermission,
+            user_typeN: PartiallyResolvedPermission,
         }
     """
 
@@ -208,12 +208,12 @@ def _parse_csv(
         if reader.fieldnames[:4] != ["Model", "App", "Action", "Is Global"]:
             raise RuntimeError(f"Invalid csv_permissions CSV column headers found in {file_path}")
 
-        auth_groups = reader.fieldnames[4:]
-        if not auth_groups:
+        user_types = reader.fieldnames[4:]
+        if not user_types:
             raise RuntimeError(f"Invalid csv_permissions CSV column headers found in {file_path}")
 
         perm_is_global = {}
-        perm_group_details = {}
+        perm_user_type_details = {}
 
         # We can't just count the number of permissions because we don't consider
         # a file with commented out lines to be empty so keep track with a flag
@@ -251,12 +251,12 @@ def _parse_csv(
 
             if rule_name not in perm_is_global:
                 perm_is_global[rule_name] = is_global
-                perm_group_details[rule_name] = {}
+                perm_user_type_details[rule_name] = {}
 
-            for auth_group in auth_groups:
-                access_level = row[auth_group]
+            for user_type in user_types:
+                access_level = row[user_type]
 
-                perm_group_details[rule_name][auth_group] = PartiallyResolvedPermission(
+                perm_user_type_details[rule_name][user_type] = PartiallyResolvedPermission(
                     app_config=app_config,
                     model=model,
                     action=action,
@@ -266,27 +266,27 @@ def _parse_csv(
         if was_empty:
             raise RuntimeError("Empty permissions file")
 
-        return perm_is_global, perm_group_details
+        return perm_is_global, perm_user_type_details
 
 
 # should be at least as large as the number of CSV files we load. This gets called by every has_perm() so must be cached
 @lru_cache(maxsize=32)
 def _resolve_functions(
     file_path: str, resolve_rule_name: str
-) -> Tuple[Dict[PermName, Dict[GroupName, PermCheckCallable]], Dict[PermName, bool]]:
+) -> Tuple[Dict[PermName, Dict[UserType, PermCheckCallable]], Dict[PermName, bool]]:
     """
     :param file_path: Path to the CSV from which to import.
     :resolve_rule_name: the settings.CSV_PERMISSIONS_RESOLVE_RULE_NAME setting. This is not actually used but is needed for lru_cache invalidation
     :return: A tuple of dictionaries:
-            The first maps the permissions for each group to a function determining if the user has access.
+            The first maps the permissions for each UserType to a function determining if the user has access.
             The second maps the permission to a boolean indicating whether the permission is object level or global level.
     """
 
-    permission_is_global, perm_group_details = _parse_csv(file_path)
+    permission_is_global, perm_user_type_details = _parse_csv(file_path)
 
-    permission_to_group_to_function = {perm: {} for perm in permission_is_global.keys()}
+    permission_to_user_type_to_function = {perm: {} for perm in permission_is_global.keys()}
     for permission, is_global in permission_is_global.items():
-        for group, detail in perm_group_details[permission].items():
+        for user_type, detail in perm_user_type_details[permission].items():
             access_level = detail.access_level or ""
             if detail.model is None:
                 model_name = None
@@ -327,13 +327,13 @@ def _resolve_functions(
                 continue
 
             try:
-                permission_to_group_to_function[permission][group] = _resolve_function(
+                permission_to_user_type_to_function[permission][user_type] = _resolve_function(
                     detail.app_config, access_level, function_name, is_global
                 )
             except RuntimeError as e:
                 raise RuntimeError(f"{e} Permission: {permission}")
 
-    return permission_to_group_to_function, permission_is_global
+    return permission_to_user_type_to_function, permission_is_global
 
 
 # note that django creates a new instance of an auth backend for every permission check!
@@ -354,13 +354,13 @@ class CSVPermissionsBackend:
 
     def has_perm(self, user: Model, perm: str, obj: Model) -> bool:
         try:
-            user_group = str(user.get_profile().user_type)
+            user_type = str(user.get_profile().user_type)
         except AttributeError:
             # Not logged in / No user profile
             return False
 
         try:
-            func = self.permission_lookup[perm][user_group]
+            func = self.permission_lookup[perm][user_type]
         except KeyError:
             # Permission or group doesn't exist in CSV
             return None
