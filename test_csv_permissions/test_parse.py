@@ -126,7 +126,7 @@ class CsvParsingTests(TestCase):
         with override_csv_permissions([csv_header_data + "\n" * 3 + "#" + csv_bad_line]):
             self.assertFalse(user.has_perm("test_csv_permissions.approve_testmodela", None))
 
-        with self.assertRaises(LookupError):
+        with self.assertRaisesRegex(ValueError, 'Incomplete'):
             with override_csv_permissions([csv_header_data + "\n" * 3 + csv_bad_line]):
                 self.assertFalse(user.has_perm("test_csv_permissions.approve_testmodela", None))
 
@@ -250,3 +250,44 @@ class CsvParsingTests(TestCase):
         with self.assertRaisesRegex(ValueError, 'inconsistent with a previous CSV file'):
             with override_csv_permissions([csv_data1, csv_data2]):
                 csv_permissions.permissions.CSVPermissionsBackend()
+
+    def test_empty_user_type(self):
+        csv_data = f"""
+        Model,      App,                  Action,   Is Global,  , {USER1_TYPE},
+        TestModelA, test_csv_permissions, foo,      yes,        ,  yes,
+        """.strip()
+
+        user1 = User1Factory(email="user1@localhost.test")
+        user_empty = User2Factory(email="user2@localhost.test")
+        user_empty.user_type = ""
+
+        with override_csv_permissions([csv_data]):
+            self.assertTrue(user1.has_perm("test_csv_permissions.foo_testmodela"))
+
+            with override_settings(CSV_PERMISSIONS_STRICT=True):
+                with self.assertRaises(LookupError):
+                    user_empty.has_perm("test_csv_permissions.foo_testmodela")
+
+            with override_settings(CSV_PERMISSIONS_STRICT=False):
+                self.assertFalse(user_empty.has_perm("test_csv_permissions.foo_testmodela"))
+
+    def test_empty_user_type_not_empty_column(self):
+        csv_data = f"""
+        Model,      App,                  Action,   Is Global,  ,     {USER1_TYPE},
+        TestModelA, test_csv_permissions, foo,      yes,        all,  yes,
+        """.strip()
+
+        with self.assertRaisesRegex(ValueError, 'empty user_type'):
+            with override_csv_permissions([csv_data]):
+                csv_permissions.permissions.CSVPermissionsBackend()
+
+    def test_duplicate_header(self):
+        csv_data = f"""
+        Model,      App,                  Action,   Is Global,  {USER1_TYPE}, {USER1_TYPE},
+        TestModelA, test_csv_permissions, foo,      yes,        yes,          yes,
+        """.strip()
+
+        with self.assertRaisesRegex(ValueError, 'Duplicate'):
+            with override_csv_permissions([csv_data]):
+                csv_permissions.permissions.CSVPermissionsBackend()
+

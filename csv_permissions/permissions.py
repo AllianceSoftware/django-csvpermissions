@@ -1,4 +1,4 @@
-from csv import DictReader
+import csv
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict
@@ -78,14 +78,25 @@ def _parse_csv(
     """
 
     with open(file_path, "r") as csv_file:
-        reader = DictReader(csv_file, skipinitialspace=True)
+        reader = csv.reader(csv_file, skipinitialspace=True)
 
-        if reader.fieldnames[:4] != ["Model", "App", "Action", "Is Global"]:
+        # get first row of headers
+        fieldnames = next(reader)
+
+        prelim_headers = ["Model", "App", "Action", "Is Global"]
+        prelim_header_count = len(prelim_headers)
+
+        if fieldnames[:prelim_header_count] != prelim_headers:
             raise ValueError(f"Invalid csv_permissions CSV column headers found in {file_path}")
 
-        user_types = reader.fieldnames[4:]
-        if not user_types:
-            raise ValueError(f"Invalid csv_permissions CSV column headers found in {file_path}")
+        user_type_headers = fieldnames[prelim_header_count:]
+
+        nonempty_user_type_headers = [user_type for user_type in user_type_headers if user_type != ""]
+        if len(set(nonempty_user_type_headers)) != len(nonempty_user_type_headers):
+            raise ValueError(f"Duplicate csv_permissions CSV column headers found in {file_path}")
+
+        if len(nonempty_user_type_headers) == 0:
+            raise ValueError(f"Missing user_type headers in {file_path}")
 
         perm_is_global = {}
         perm_user_type_unresolved: Dict[PermName, Dict[UserType, UnresolvedEvaluator]] = {}
@@ -93,24 +104,29 @@ def _parse_csv(
         # We can't just count the number of permissions read because we don't consider
         # a file with commented out lines to be empty so keep track with a flag
         was_empty = True
-        for row in reader:
+
+        for line_number, row in enumerate(reader):
             was_empty = False
-            if all(x is None or x.strip() == "" for x in row.values()):
+            if all(x is None or x.strip() == "" for x in row):
                 # ignore completely empty rows
                 continue
-            model_name_orig = row["Model"]  # note that capitalisation may differ to model._meta.model_name
 
-            if any(model_name_orig.strip().startswith(comment_prefix) for comment_prefix in ("//", "#")):
+            if any(row[0].strip().startswith(comment_prefix) for comment_prefix in ("//", "#")):
                 # Ignore lines beginning with comment chars
                 continue
 
-            app_config = apps.get_app_config(row["App"])
+            if len(row) < prelim_header_count:
+                raise ValueError(f"Incomplete line {line_number} in {csv_file}")
+
+            # note that model capitalisation may differ to model._meta.model_name
+            model_name_orig, app_label, action, is_global = row[:prelim_header_count]
+
+            app_config = apps.get_app_config(app_label)
             model = app_config.get_model(model_name_orig) if model_name_orig else None
 
-            action = row["Action"]
-            if row["Is Global"] == "yes":
+            if is_global == "yes":
                 is_global = True
-            elif row["Is Global"] == "no":
+            elif is_global == "no":
                 is_global = False
             else:
                 raise ValueError("Invalid value for Is Global.")
@@ -121,22 +137,30 @@ def _parse_csv(
                 perm_is_global[permission] = is_global
                 perm_user_type_unresolved[permission] = {}
 
-            for user_type in user_types:
-                evaluator_name = row[user_type]
+            for i, user_type in enumerate(user_type_headers):
+                try:
+                    evaluator_name = row[prelim_header_count + i]
+                except IndexError:
+                    continue
 
-                perm_user_type_unresolved[permission][user_type] = UnresolvedEvaluator(
-                    app_config=app_config,
-                    model=model,
-                    is_global=is_global,
-                    permission=permission,
-                    action=action,
-                    evaluator_name=evaluator_name,
-                )
+                if user_type == "":
+                    # if a column has an empty user type then that's allowed but only if the entire column is empty
+                    if evaluator_name != "":
+                        raise ValueError(f"Columns with an empty user_type must be completely empty")
+                else:
+                    perm_user_type_unresolved[permission][user_type] = UnresolvedEvaluator(
+                        app_config=app_config,
+                        model=model,
+                        is_global=is_global,
+                        permission=permission,
+                        action=action,
+                        evaluator_name=evaluator_name,
+                    )
 
         if was_empty:
             raise ValueError("Empty permissions file")
 
-        return perm_is_global, perm_user_type_unresolved, user_types
+        return perm_is_global, perm_user_type_unresolved, nonempty_user_type_headers
 
 
 # should be at least as large as the number of CSV files we load. This gets called by every has_perm() so must be cached
