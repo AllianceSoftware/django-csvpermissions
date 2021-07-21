@@ -68,17 +68,17 @@ Model,     App,           Action,            Is Global, admin, assistant, custom
 
 # Comment lines and blank lines will be ignored
 
-Publisher, library,       add,               no,        all,
+Publisher, library,       add,               yes,       yes,
 Publisher, library,       view,              no,        all,
 Publisher, library,       change,            no,        all,
 Publisher, library,       delete,            no,        all,
 
-Book,      library,       add,               no,        all,   all,
+Book,      library,       add,               yes,       yes,   yes,
 Book,      library,       view,              no,        all,   all,
 Book,      library,       change,            no,        all,   all,
 Book,      library,       delete,            no,        all,   all,
 
-Loan,      library,       add,               no,        all,   all,       own,
+Loan,      library,       add,               yes,       yes,   yes,       yes,
 Loan,      library,       view,              no,        all,   all,       own,
 Loan,      library,       change,            no,        all,   all,
 Loan,      library,       delete,            no,        all,   all,
@@ -89,9 +89,26 @@ Loan,      library,       delete,            no,        all,   all,
 ,          library,       report_popularity, yes,      yes,   yes,
 ```
 
-In the example above, a `User` whose `user_type=="admin"` would have the `add` permission
-associated with the `library` app and 
-`library.add_publisher` 
+The first 4 columns define the permission details:
+
+**Model** is used to resolve the permission name but is otherwise not used. There is no checks that objects passed to the `has_perm()` actually match the correct type.
+
+**App** is used to resolve the permission name and model.
+
+**Action** is an arbitrary identifier that is used to resolve the permission name.
+
+**Is Global** whether the permission is global or per-object (see "Global Permission" section below)
+
+**Evaluators**
+
+The next columns define permission "evaluators".
+
+Built-in evaluators are:
+
+* `all` - user has permission for all objects. Will raise an error  if an object is not passed to `has_perm()`
+* `yes` - user has permission globally. Will raise an error if an object is passed to `has_perm()`.
+* (empty cell) -- user does not have permission (global or per-object) 
+
 
 ### Global Permissions
 
@@ -114,6 +131,84 @@ print(
     else "foo-bar is a per-object permission"
 )
 ```
+
+### Custom Evaluators
+
+By default putting other than a built-in evaluator in a CSV permissions file
+will raise an error.
+
+You add your own permission evaluators by defining "evaluator resolver"
+functions which ingest a CSV cell value and returns a permission evaluator.
+If the resolver does not recognise something it should return `None` and the
+next resolver in the list will be called.
+
+```python
+# in settings.py
+CSV_PERMISSIONS_RESOLVE_EVALUATORS = (
+    # sanity checks
+    'csv_permissions.evaluators.resolve_validation_evaluator',
+    # custom validators (examples below)
+    'my_app.evaluators.resolve_evaluators',
+    # 'all'/'yes'/'' 
+    'csv_permissions.evaluators.resolve_all_evaluator',
+    'csv_permissions.evaluators.resolve_yes_evaluator',
+    'csv_permissions.evaluators.resolve_empty_evaluator',
+    # normally if nothing matches an exception will be thrown however it 
+    # can be more convenient (especially in early phases of development )
+    # to issue a warning during CSV parsing, and then throw a
+    # NotImplementedError() when the permission is evaluated
+    'csv_permissions.evaluators.resolve_fallback_not_implemented_evaluator',
+)
+
+# if you don't have any customisations you can point to a list/tuple
+# that is defined elsewhere; this is a basic set:
+#CSV_PERMISSIONS_RESOLVE_EVALUATORS = "csv_permissions.evaluators.default_resolve_evaluators"
+
+# for compatibility with csv_permissions 0.1.0
+#CSV_PERMISSIONS_RESOLVE_EVALUATORS = "csv_permissions.legacy.resolve_evaluators"
+
+```
+
+The following code will define some custom evaluators: 
+- `'if_monday'` grants all access on mondays.
+- `'all_caps'` grants access to all objects that have a `name` field containing
+    all uppercase.
+
+In `my_app.evaluators`:
+```python
+import datetime
+from typing import Optional
+
+from csv_permissions.types import Evaluator
+from csv_permissions.types import UnresolvedEvaluator
+
+
+def evaluate_if_monday(user, obj=None):
+    return datetime.datetime.today().weekday() == 0
+
+def evaluate_all_caps(user, obj=None):
+    if obj is None:
+        raise ValueError("'all_caps' cannot be used as a global permission.")
+    
+    try:
+        return obj.name.isupper()
+    except AttributeError:
+        return False
+     
+def resolve_evaluators(details: UnresolvedEvaluator) -> Optional[Evaluator]:
+    if details.evaluator_name == "if_monday":
+        return evaluate_if_monday
+
+    if details.evaluator_name == "all_caps":
+        if details.is_global != False:
+            raise ValueError("'all_caps' cannot be used as a global permission.")
+        return evaluate_if_monday
+
+    return None
+```
+
+* Note that evaluator names do not have to be static strings: you could implement
+    something that understood `'all_caps:True'` and `'all_caps:False'` for example
 
 ### Unrecognised Permissions
 

@@ -34,6 +34,7 @@ so make sure you follow the template
 * Add explicit support for python 3.6-3.9
 * Add `CSV_PERMISSIONS_STRICT` setting
 * Add support for multiple CSV files
+* Add `CSV_PERMISSIONS_RESOLVE_EVALUATORS`
 
 ### Changed
 * `CSV_PERMISSIONS_PATH` setting deprecated in favour of `CSV_PERMISSIONS_PATHS`

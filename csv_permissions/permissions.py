@@ -1,16 +1,13 @@
 from csv import DictReader
-from typing import Iterable
-from typing import Set
-
-from dataclasses import dataclass
 from functools import lru_cache
-from functools import wraps
 from pathlib import Path
-from typing import Callable
 from typing import Dict
+from typing import Iterable
 from typing import Optional
+from typing import Set
 from typing import Tuple
 from typing import Type
+from typing import Union
 import warnings
 
 from django.apps import AppConfig
@@ -22,133 +19,12 @@ from django.db.models import Model
 from django.http import HttpRequest
 from django.utils.module_loading import import_string
 
-# a callable to check whether a has a permission for a given object
-PermCheckCallable = Callable[[Model, Optional[Model]], bool]
-
-# a permission name
-PermName = str
-
-# a user type
-UserType = str
-
-# function to resolve a permission name
-ResolvePermNameFunc = Callable[[AppConfig, Type[Model], str, bool], str]
-
-#TODO: don't hardcode this
-# mapping of predefined actions to is_global
-_PREDEFINED_ACTION_IS_GLOBAL = {
-    "list": True,
-    "detail": False,
-    "create": True,
-    "add": True,
-    "change": False,
-    "update": False,
-    "delete": False,
-}
-
-
-def _access_level_yes(user, obj=None) -> bool:
-    if obj is not None:
-        raise RuntimeError("'yes' cannot be used with object-level permissions.")
-
-    return True
-
-
-def _access_level_no(user, obj=None) -> bool:
-    return False
-
-
-def _access_level_all(user, obj=None) -> bool:
-    if obj is None:
-        raise RuntimeError("'all' cannot be used with global permissions.")
-
-    return True
-
-
-def _access_level_own(own_function, user, obj=None) -> bool:
-    if obj is None:
-        raise RuntimeError("'own' cannot be used with global permissions.")
-
-    return own_function(user, obj)
-
-
-def _access_level_custom(custom_function, user, obj=None) -> bool:
-    return custom_function(user, obj)
-
-
-def _resolve_function(
-    app_config: AppConfig, access_level: str, function_name: str, is_global: bool
-) -> PermCheckCallable:
-    """
-    Returns the callable for determining permissions based on access level.
-
-    :param app_label: The Django app label for the permission.
-    :param access_level: One of 'yes/''/'all'/'own'/'custom'
-    :param function_name: The name of the permission function. If access_level is own or custom, it will be
-    searched for in the rules module of app_label.
-    :param is_global: A boolean indicating whether the access level applies at the global or object level.
-    :return: The function to call to determine if a user has access.
-    """
-
-    app_label = app_config.label
-
-    if access_level == "yes":
-        if not is_global:
-            raise RuntimeError("'yes' cannot be used with object-level permissions.")
-
-        return _access_level_yes
-
-    if access_level == "":
-        return _access_level_no
-
-    if access_level == "all":
-        if is_global:
-            raise RuntimeError("'all' cannot be used with global permissions.")
-
-        return _access_level_all
-
-    if access_level == "own":
-        if is_global:
-            raise RuntimeError("'own' cannot be used with global permissions.")
-
-        try:
-            app_config = apps.get_app_config(app_label)
-            permission_function = import_string(f"{app_config.name}.rules.{function_name}")
-        except ImportError:
-            message = f"No implementation of {function_name}() in {app_label}.rules"
-            warnings.warn(message, stacklevel=2)
-
-            def _permission_function(user, obj=None) -> bool:
-                raise NotImplementedError(message)
-
-            _permission_function.__name__ = function_name
-            permission_function = _permission_function
-
-        @wraps(permission_function)
-        def own_function(user, obj=None) -> bool:
-            return _access_level_own(permission_function, user, obj)
-
-        return own_function
-
-    if access_level == "custom":
-        try:
-            app_config = apps.get_app_config(app_label)
-            permission_function = import_string(f"{app_config.name}.rules.{function_name}")
-        except ImportError:
-            message = f"No implementation of {function_name}() in {app_label}.rules"
-            warnings.warn(message, stacklevel=2)
-
-            def _permission_function(user, obj=None):
-                raise NotImplementedError(message)
-
-            _permission_function.__name__ = function_name
-            permission_function = _permission_function
-
-        @wraps(permission_function)
-        def custom_function(user, obj=None) -> bool:
-            return _access_level_custom(permission_function, user, obj)
-
-        return custom_function
+from .types import Evaluator
+from .types import PermName
+from .types import ResolveEvaluatorFunc
+from .types import ResolvePermNameFunc
+from .types import UnresolvedEvaluator
+from .types import UserType
 
 
 def _default_resolve_permission_name(
@@ -162,25 +38,16 @@ def _default_resolve_permission_name(
     return permission_name
 
 
-# FIXME - @Levi to add doc / explanation to this. see https://gitlab.internal.alliancesoftware.com.au/alliance/template-django/-/merge_requests/150#note_91667
-@dataclass
-class PartiallyResolvedPermission:
-    app_config: AppConfig
-    model: Model
-    action: str
-    access_level: str
-
-
 def _parse_csv(
     file_path: Path,
     resolve_permission_name_func: ResolvePermNameFunc,
 ) -> Tuple[
     Dict[PermName, bool],
-    Dict[PermName, Dict[UserType, PartiallyResolvedPermission]],
+    Dict[PermName, Dict[UserType, UnresolvedEvaluator]],
     Iterable[str],
 ]:
     """
-    Parses the CSV of user_type permissions returns a list of permissions for further processing.
+    Parses the CSV of user_type permissions returns data for further processing.
 
     CSV file format:
         entity, app_name, permission_name, is_global, user_type1, user_type2, .. user_typeN
@@ -203,27 +70,27 @@ def _parse_csv(
         - A dict mapping permission name to bool of whether that permission is global or not
         - A dict mapping a permission to a dict of user_types to partially resolved permission details:
             permission_name: {
-                user_type1: PartiallyResolvedPermission,
+                user_type1: UnresolvedEvaluator,
                 ...
-                user_typeN: PartiallyResolvedPermission,
+                user_typeN: UnresolvedEvaluator,
             }
         - A list of user types
     """
 
-    with file_path.open("r") as csv_file:
+    with open(file_path, "r") as csv_file:
         reader = DictReader(csv_file, skipinitialspace=True)
 
         if reader.fieldnames[:4] != ["Model", "App", "Action", "Is Global"]:
-            raise RuntimeError(f"Invalid csv_permissions CSV column headers found in {file_path}")
+            raise ValueError(f"Invalid csv_permissions CSV column headers found in {file_path}")
 
         user_types = reader.fieldnames[4:]
         if not user_types:
-            raise RuntimeError(f"Invalid csv_permissions CSV column headers found in {file_path}")
+            raise ValueError(f"Invalid csv_permissions CSV column headers found in {file_path}")
 
         perm_is_global = {}
-        perm_user_type_details = {}
+        perm_user_type_unresolved: Dict[PermName, Dict[UserType, UnresolvedEvaluator]] = {}
 
-        # We can't just count the number of permissions because we don't consider
+        # We can't just count the number of permissions read because we don't consider
         # a file with commented out lines to be empty so keep track with a flag
         was_empty = True
         for row in reader:
@@ -246,35 +113,30 @@ def _parse_csv(
             elif row["Is Global"] == "no":
                 is_global = False
             else:
-                raise RuntimeError("Invalid value for Is Global.")
-
-            if _PREDEFINED_ACTION_IS_GLOBAL.get(action, is_global) != is_global:
-                raise RuntimeError(
-                    "Invalid action / global setting for"
-                    f" {app_config.label}.{model_name_orig}.{action} (is_global should"
-                    f" not be {is_global})"
-                )
+                raise ValueError("Invalid value for Is Global.")
 
             permission = resolve_permission_name_func(app_config, model, action, is_global)
 
             if permission not in perm_is_global:
                 perm_is_global[permission] = is_global
-                perm_user_type_details[permission] = {}
+                perm_user_type_unresolved[permission] = {}
 
             for user_type in user_types:
-                access_level = row[user_type]
+                evaluator_name = row[user_type]
 
-                perm_user_type_details[permission][user_type] = PartiallyResolvedPermission(
+                perm_user_type_unresolved[permission][user_type] = UnresolvedEvaluator(
                     app_config=app_config,
                     model=model,
+                    is_global=is_global,
+                    permission=permission,
                     action=action,
-                    access_level=access_level,
+                    evaluator_name=evaluator_name,
                 )
 
         if was_empty:
-            raise RuntimeError("Empty permissions file")
+            raise ValueError("Empty permissions file")
 
-        return perm_is_global, perm_user_type_details, user_types
+        return perm_is_global, perm_user_type_unresolved, user_types
 
 
 # should be at least as large as the number of CSV files we load. This gets called by every has_perm() so must be cached
@@ -282,8 +144,9 @@ def _parse_csv(
 def _resolve_functions(
     file_paths: Tuple[Path, ...],
     resolve_permission_name: Optional[str],
+    resolve_evaluators: Iterable[Union[str, ResolveEvaluatorFunc]],
 ) -> Tuple[
-    Dict[PermName, Dict[UserType, PermCheckCallable]],
+    Dict[PermName, Dict[UserType, Evaluator]],
     Dict[PermName, bool],
     Set[str],
     Set[str]
@@ -303,16 +166,22 @@ def _resolve_functions(
     else:
         resolve_permission_name = import_string(resolve_permission_name)
 
+    resolve_evaluators = tuple(
+        import_string(resolve_evaluator) if isinstance(resolve_evaluator, str) else resolve_evaluator
+        for resolve_evaluator
+        in resolve_evaluators
+    )
 
     permission_is_global: Dict[PermName, bool] = {}
 
     known_user_types: Set[UserType] = set()
     known_perms: Set[PermName] = set()
 
-    permission_to_user_type_to_partially_resolved: Dict[PermName, Dict[UserType, PartiallyResolvedPermission]] = {}
+    permission_to_user_type_to_unresolved: Dict[PermName, Dict[UserType, UnresolvedEvaluator]] = {}
 
     for file_path in file_paths:
-        file_permission_is_global, perm_user_type_details, user_types = _parse_csv(file_path, resolve_permission_name)
+        file_permission_is_global, new_permission_to_user_type_to_unresolved, user_types = \
+            _parse_csv(file_path, resolve_permission_name)
 
         # merge global list of known user types/permissions
         known_user_types.update(set(user_types))
@@ -324,78 +193,43 @@ def _resolve_functions(
                 raise ValueError(f"'Is Global' for {permission} in {file_path} is inconsistent with a previous CSV file")
         permission_is_global.update(file_permission_is_global)
 
-        # merge partially resolved permissions
-        for permission, user_type_to_partially_resolved in perm_user_type_details.items():
-            if permission not in permission_to_user_type_to_partially_resolved:
-                permission_to_user_type_to_partially_resolved[permission] = {}
-            for user_type, partially_resolved in user_type_to_partially_resolved.items():
-                if user_type in permission_to_user_type_to_partially_resolved[permission]:
-                    if partially_resolved != permission_to_user_type_to_partially_resolved[permission][user_type]:
-                        raise ValueError(f"Permission {permission} for user type {user_type} in {file_path} is inconsistent with a previous CSV file")
+        # merge unresolved permissions
+        for permission, new_user_type_to_unresolved in new_permission_to_user_type_to_unresolved.items():
+            if permission not in permission_to_user_type_to_unresolved:
+                permission_to_user_type_to_unresolved[permission] = {}
+            for user_type, new_unresolved in new_user_type_to_unresolved.items():
+                if user_type in permission_to_user_type_to_unresolved[permission]:
+                    if new_unresolved != permission_to_user_type_to_unresolved[permission][user_type]:
+                        raise ValueError(
+                            f"Permission {permission} for user type {user_type} in "
+                            f"{file_path} is inconsistent with a previous CSV file"
+                        )
                 else:
-                    permission_to_user_type_to_partially_resolved[permission][user_type] = partially_resolved
-
-
-    permission_to_user_type_to_function: Dict[PermName, Dict[UserType, PermCheckCallable]] = {}
+                    permission_to_user_type_to_unresolved[permission][user_type] = new_unresolved
 
     # now take the partially resolved functions and resolve them
-    for permission, user_type_to_partially_resolved in permission_to_user_type_to_partially_resolved.items():
-        is_global = permission_is_global[permission]
-        if permission not in permission_to_user_type_to_function:
-            permission_to_user_type_to_function[permission] = {}
-        for user_type, detail in user_type_to_partially_resolved.items():
-            access_level = detail.access_level or ""
-            if detail.model is None:
-                model_name = None
-                if not is_global:
-                    raise RuntimeError("Permissions without Models must be global.")
-            else:
-                model_name = detail.model._meta.model_name
-
-            function_name = ""
-            if access_level.startswith("own:"):
-                own = access_level.split(":", 1)[-1].strip()
-                if not own:
-                    message = (
-                        "No function name specified for 'own:'. Remove ':' or specify a" " function to call."
-                    )
-                    raise RuntimeError(message)
-
-                function_name = f"{model_name}_own_{own}"
-                access_level = "own"
-
-            elif access_level == "own":
-                function_name = f"{model_name}_own"
-                access_level = "own"
-
-            elif access_level.startswith("custom:"):
-                custom = access_level.split(":", 1)[-1].strip()
-                if not custom:
-                    raise RuntimeError("No custom function name specified.")
-
-                function_name = custom
-                access_level = "custom"
-
-            elif access_level in ("all", "", "yes"):
-                pass
-
-            else:
-                warnings.warn(f"{access_level} is not a valid access level.")
-                continue
-
+    permission_to_user_type_to_evaluator: Dict[PermName, Dict[UserType, Evaluator]] = {}
+    for permission, user_type_to_unresolved in permission_to_user_type_to_unresolved.items():
+        if permission not in permission_to_user_type_to_evaluator:
+            permission_to_user_type_to_evaluator[permission] = {}
+        for user_type, detail in user_type_to_unresolved.items():
             try:
-                permission_to_user_type_to_function[permission][user_type] = _resolve_function(
-                    detail.app_config, access_level, function_name, is_global
-                )
-            except RuntimeError as e:
-                raise RuntimeError(f"{e} Permission: {permission}")
+                for resolve_evaluator in resolve_evaluators:
+                    evaluator = resolve_evaluator(detail)
+                    if evaluator is not None:
+                        permission_to_user_type_to_evaluator[permission][user_type] = evaluator
+                        break
+                else:
+                    raise ValueError(f"Could not resolve {permission} for {user_type} to anything")
+            except Exception as e:
+                raise RuntimeError(f"Error resolving {permission} for {user_type}: {detail.evaluator_name} ({e})") from e
 
-    return permission_to_user_type_to_function, permission_is_global, known_user_types, known_perms
+    return permission_to_user_type_to_evaluator, permission_is_global, known_user_types, known_perms
 
 
 # note that django creates a new instance of an auth backend for every permission check!
 class CSVPermissionsBackend:
-    permission_lookup: Dict[PermName, Dict[UserType, PermCheckCallable]]
+    permission_lookup: Dict[PermName, Dict[UserType, Evaluator]]
     permission_is_global: Dict[PermName, bool]
     known_user_types: Set[UserType]
     known_perms: Set[PermName]
@@ -415,8 +249,10 @@ class CSVPermissionsBackend:
                 )
                 permissions_paths = settings.CSV_PERMISSIONS_PATHS
 
-        # convert to a tuple so that it's hashable and _resolve_functions() can have @lru_cache() applied
-        permissions_paths = tuple(Path(p) for p in permissions_paths)
+        # make sure it's always a tuple so that it's hashable and _resolve_functions() can have @lru_cache() applied
+        if not isinstance(permissions_paths, tuple):
+            permissions_paths = tuple(permissions_paths)
+            settings.CSV_PERMISSIONS_PATHS = permissions_paths
 
         try:
             resolve_perm_name = settings.CSV_PERMISSIONS_RESOLVE_PERM_NAME
@@ -432,9 +268,22 @@ class CSVPermissionsBackend:
                 )
                 resolve_perm_name = settings.CSV_PERMISSIONS_RESOLVE_RULE_NAME
 
+        try:
+            resolve_evaluators = settings.CSV_PERMISSIONS_RESOLVE_EVALUATORS
+        except AttributeError:
+            raise ImproperlyConfigured(
+                'settings.CSV_PERMISSIONS_RESOLVE_EVALUATORS must be defined. '
+                'For legacy 0.1.0 compatibility use "csv_permissions.legacy.legacy_resolve_evaluator".'
+            )
+        else:
+            if isinstance(resolve_evaluators, str):
+                resolve_evaluators = import_string(resolve_evaluators)
+            resolve_evaluators = tuple(resolve_evaluators)
+
         self.permission_lookup, self.permission_is_global, self.known_user_types, self.known_perms = _resolve_functions(
             permissions_paths,
-            resolve_perm_name
+            resolve_perm_name,
+            resolve_evaluators,
         )
 
     def authenticate(self, request: HttpRequest, username: Optional[str] = None, password: Optional[str] = None):
