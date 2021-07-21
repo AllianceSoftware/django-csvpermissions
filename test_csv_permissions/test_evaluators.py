@@ -10,11 +10,11 @@ import csv_permissions.permissions
 
 from .models import TestModelA
 from .models import TestModelD
+from .test_utils import override_csv_permissions
 from .test_utils import USER1_TYPE
 from .test_utils import User1Factory
 from .test_utils import USER2_TYPE
 from .test_utils import User2Factory
-from .test_utils import override_csv_permissions
 
 
 @override_settings(
@@ -40,8 +40,8 @@ class EvaluatorsTest(TestCase):
         """.strip()
 
         with override_csv_permissions([csv_data]):
-            user1 = User1Factory(email="user2@localhost.test")
-            user2 = User2Factory(email="user1@localhost.test")
+            user1 = User1Factory()
+            user2 = User2Factory()
 
             expected_results = (
                 # (model, permission, pass_model, has_perm(USER1)?, has_perm(USER2)? )
@@ -84,7 +84,7 @@ class EvaluatorsTest(TestCase):
         """.strip()
 
         with override_csv_permissions([csv_data]):
-            user = User1Factory(email="user@localhost.test")
+            user = User1Factory()
 
             with self.assertRaisesRegex(RuntimeError, 'global'):
                 csv_permissions.permissions.CSVPermissionsBackend()
@@ -96,7 +96,7 @@ class EvaluatorsTest(TestCase):
         """.strip()
 
         with override_csv_permissions([csv_data]):
-            user = User1Factory(email="user@localhost.test")
+            user = User1Factory()
 
             with self.assertRaises(RuntimeError):
                 csv_permissions.permissions.CSVPermissionsBackend()
@@ -111,8 +111,10 @@ class EvaluatorsTest(TestCase):
         TestModelA, test_csv_permissions, detail,   no,         all,
         """.strip()
 
+        user = User1Factory()
+
         with override_csv_permissions([csv_data]):
-            user = User1Factory(email="user@localhost.test")
+            csv_permissions.permissions.CSVPermissionsBackend()
 
             with self.assertRaises(ValueError):
                 user.has_perm("test_csv_permissions.detail_testmodela", None)
@@ -145,8 +147,10 @@ class EvaluatorsTest(TestCase):
         TestModelD, test_csv_permissions, list,     yes,        yes,
         """.strip()
 
+        user = User2Factory()
+
         with override_csv_permissions([csv_data]):
-            user = User2Factory(email="user@localhost.test")
+            csv_permissions.permissions.CSVPermissionsBackend()
 
             self.assertTrue(
                 user.has_perm("test_csv_permissions.list_testmodeld", None),
@@ -179,8 +183,9 @@ class EvaluatorsTest(TestCase):
         TestModelD, test_csv_permissions, list,     yes,        ,
         """.strip()
 
+        user = User1Factory()
+
         with override_csv_permissions([csv_data]):
-            user = User1Factory(email="user@localhost.test")
 
             self.assertFalse(
                 user.has_perm("test_csv_permissions.list_testmodeld", None),

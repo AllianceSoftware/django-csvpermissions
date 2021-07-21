@@ -1,7 +1,5 @@
 import factory
 
-from test_csv_permissions.models import CustomerProfile
-from test_csv_permissions.models import StaffProfile
 from test_csv_permissions.models import User
 
 
@@ -20,7 +18,7 @@ class UserFactory(factory.django.DjangoModelFactory):
 
     @factory.sequence
     def email(n):
-        return f"{n}-" + factory.Faker("email", domain="example.com").generate({})
+        return f"email-{n}@example.com"
 
     @classmethod
     def _after_postgeneration(cls, instance: User, create: bool, results=None):
@@ -32,14 +30,3 @@ class UserFactory(factory.django.DjangoModelFactory):
 
     class Meta:
         model = User
-
-
-class CustomerUserFactory(UserFactory):
-    class Meta:
-        model = CustomerProfile
-
-
-class StaffUserFactory(UserFactory):
-    class Meta:
-        model = StaffProfile
-

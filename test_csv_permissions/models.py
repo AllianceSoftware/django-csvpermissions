@@ -11,18 +11,15 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     email = models.EmailField(unique=True)
 
+    USER_TYPE_CUSTOMER = "customer"
+    USER_TYPE_STAFF = "staff"
+    USER_TYPE_CHOICES = (
+        (USER_TYPE_CUSTOMER, "Customer"),
+        (USER_TYPE_STAFF, "Staff"),
+    )
 
-class CustomerProfile(User):
-    user_type = 'customer'
-    first_name = models.CharField(max_length=255)
-    last_name = models.CharField(max_length=255)
+    user_type = models.CharField(max_length=255, choices=USER_TYPE_CHOICES)
 
-    def get_profile(self):
-        return self
-
-
-class StaffProfile(User):
-    user_type = 'staff'
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
 

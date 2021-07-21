@@ -19,7 +19,6 @@ from .test_utils import User2Factory
 from .test_utils import warning_filter
 
 
-
 @warning_filter("ignore", category=DeprecationWarning)
 @override_settings(
     CSV_PERMISSIONS_STRICT=True,
@@ -44,8 +43,8 @@ class LegacyEvaluatorsTest(TestCase):
         """.strip()
 
         with override_csv_permissions([csv_data]):
-            user1 = User1Factory(email="user2@localhost.test")
-            user2 = User2Factory(email="user1@localhost.test")
+            user1 = User1Factory()
+            user2 = User2Factory()
 
             expected_results = (
                 # (model, permission, pass_model, has_perm(USER1)?, has_perm(USER2)? )
@@ -92,7 +91,7 @@ class LegacyEvaluatorsTest(TestCase):
         """.strip()
 
         with override_csv_permissions([csv_data]):
-            user = User1Factory(email="user@localhost.test")
+            user = User1Factory()
 
             with self.assertRaisesMessage(RuntimeError, "Invalid action / global setting"):
                 csv_permissions.permissions.CSVPermissionsBackend()
@@ -104,7 +103,7 @@ class LegacyEvaluatorsTest(TestCase):
         """.strip()
 
         with override_csv_permissions([csv_data]):
-            user = User1Factory(email="user@localhost.test")
+            user = User1Factory()
 
             with self.assertRaises(RuntimeError):
                 csv_permissions.permissions.CSVPermissionsBackend()
@@ -120,7 +119,7 @@ class LegacyEvaluatorsTest(TestCase):
         """.strip()
 
         with override_csv_permissions([csv_data]):
-            user = User2Factory(email="user@localhost.test")
+            user = User2Factory()
 
             self.raises = self.assertRaisesRegex(ValueError, 'global permission')
             with self.raises:
@@ -155,7 +154,7 @@ class LegacyEvaluatorsTest(TestCase):
         """.strip()
 
         with override_csv_permissions([csv_data]):
-            user = User2Factory(email="user@localhost.test")
+            user = User2Factory()
 
             self.assertFalse(
                 user.has_perm("test_csv_permissions.change_testmodele", None),

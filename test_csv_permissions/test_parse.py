@@ -10,10 +10,10 @@ import csv_permissions.permissions
 
 from .models import TestModelA
 from .test_utils import override_csv_permissions
-from .test_utils import User1Factory
 from .test_utils import USER1_TYPE
-from .test_utils import User2Factory
+from .test_utils import User1Factory
 from .test_utils import USER2_TYPE
+from .test_utils import User2Factory
 
 
 def custom_resolve_perm_name(app_config: AppConfig, model: Type[Model], action: str, is_global: bool) -> str:
@@ -44,7 +44,7 @@ class CsvParsingTests(TestCase):
         """.strip()
 
         with self.assertWarnsRegex(UserWarning, r"not implemented for test_csv_permissions.detail_testmodela"):
-            user = User1Factory(email="user@localhost.test")
+            user = User1Factory()
             with override_csv_permissions([csv_data]):
 
                 with override_settings(CSV_PERMISSIONS_STRICT=False):
@@ -60,7 +60,7 @@ class CsvParsingTests(TestCase):
         """.strip()
 
         with override_csv_permissions([csv_data]):
-            user = User1Factory(email="user@localhost.test")
+            user = User1Factory()
 
             with self.assertRaisesMessage(ValueError, "Empty permissions file"):
                 user.has_perm("test_csv_permissions.detail_testmodelb")
@@ -76,8 +76,8 @@ class CsvParsingTests(TestCase):
         """.strip()
 
         with override_csv_permissions([csv_data]):
-            user1 = User1Factory(email="user1@localhost.test")
-            user2 = User2Factory(email="user2@localhost.test")
+            user1 = User1Factory()
+            user2 = User2Factory()
 
             # a user that is recognised should be ok
             self.assertTrue(user1.has_perm("test_csv_permissions.approve_testmodela", None))
@@ -121,7 +121,7 @@ class CsvParsingTests(TestCase):
         """.strip()
 
         csv_bad_line = "blah blah blah"
-        user = User1Factory(email="user1a@localhost.test")
+        user = User1Factory()
 
         with override_csv_permissions([csv_header_data + "\n" * 3 + "#" + csv_bad_line]):
             self.assertFalse(user.has_perm("test_csv_permissions.approve_testmodela", None))
@@ -145,8 +145,6 @@ class CsvParsingTests(TestCase):
         """.strip()
 
         with override_csv_permissions([csv_data]):
-            user = User1Factory(email="user@localhost.test")
-
             with self.assertRaisesMessage(RuntimeError, "object-level"):
                 csv_permissions.permissions.CSVPermissionsBackend()
 
@@ -157,7 +155,7 @@ class CsvParsingTests(TestCase):
         TestModelE, test_csv_permissions, list,     yes,        yes,
         """.strip()
 
-        user = User2Factory(email="user@localhost.test")
+        user = User2Factory()
 
         with override_csv_permissions([csv_data]):
             # check default permission names
@@ -195,8 +193,8 @@ class CsvParsingTests(TestCase):
         TestModelD, test_csv_permissions, add,      yes,        yes,          yes,
         """.strip()
 
-        user1 = User1Factory(email="user1@localhost.test")
-        user2 = User2Factory(email="user2@localhost.test")
+        user1 = User1Factory()
+        user2 = User2Factory()
         test_a = TestModelA.objects.create()
 
         with override_csv_permissions([csv_data1, csv_data2, csv_data3]):
@@ -223,7 +221,7 @@ class CsvParsingTests(TestCase):
         TestModelA, test_csv_permissions, foo,      no,        ,
         """.strip()
 
-        user1 = User1Factory(email="user1@localhost.test")
+        user1 = User1Factory()
 
         with self.assertRaisesRegex(ValueError, 'inconsistent with a previous CSV file'):
             with override_csv_permissions([csv_data1, csv_data2]):
@@ -240,7 +238,7 @@ class CsvParsingTests(TestCase):
         TestModelA, test_csv_permissions, foo,      yes,        ,
         """.strip()
 
-        user1 = User1Factory(email="user1@localhost.test")
+        user1 = User1Factory()
 
         # consistent CSV files
         with override_csv_permissions([csv_data1, csv_data1]):
@@ -257,8 +255,8 @@ class CsvParsingTests(TestCase):
         TestModelA, test_csv_permissions, foo,      yes,        ,  yes,
         """.strip()
 
-        user1 = User1Factory(email="user1@localhost.test")
-        user_empty = User2Factory(email="user2@localhost.test")
+        user1 = User1Factory()
+        user_empty = User2Factory()
         user_empty.user_type = ""
 
         with override_csv_permissions([csv_data]):

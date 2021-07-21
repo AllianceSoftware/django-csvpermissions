@@ -7,18 +7,19 @@ import warnings
 from django.test import override_settings
 from django.test.utils import TestContextDecorator
 
-from test_csv_permissions.factory import CustomerUserFactory
-from test_csv_permissions.factory import StaffUserFactory
-from test_csv_permissions.models import CustomerProfile
-from test_csv_permissions.models import StaffProfile
+from test_csv_permissions.factory import UserFactory
+from test_csv_permissions.models import User
 
-User1Model = CustomerProfile
-USER1_TYPE = CustomerProfile.user_type
-User1Factory = lambda *args, **kwargs: CustomerUserFactory.create(*args, **kwargs)  # noqa: E731
+USER1_TYPE = User.USER_TYPE_CUSTOMER
+USER2_TYPE = User.USER_TYPE_STAFF
 
-User2Model = StaffProfile
-USER2_TYPE = StaffProfile.user_type
-User2Factory = lambda *args, **kwargs: StaffUserFactory.create(*args, **kwargs)  # noqa: E731
+
+def User1Factory(**kwargs):
+    return UserFactory.create(user_type=USER1_TYPE, **kwargs)
+
+
+def User2Factory(**kwargs):
+    return UserFactory.create(user_type=USER2_TYPE, **kwargs)
 
 
 @contextlib.contextmanager
