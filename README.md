@@ -284,3 +284,32 @@ unrecognised permission or user type.
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md)
+
+## Development
+
+### Release Process
+
+#### Poetry Config
+* Add test repository
+    * `poetry config repositories.testpypi https://test.pypi.org/legacy/`
+    * Generate an account API token at https://test.pypi.org/manage/account/token/
+    * `poetry config pypi-token.testpypi ${TOKEN}`
+        * On macs this will be stored in the `login` keychain at `poetry-repository-testpypi`
+* Main pypi repository
+    * Generate an account API token at https://pypi.org/manage/account/token/
+    * `poetry config pypi-token.pypi ${TOKEN}`
+        * On macs this will be stored in the `login` keychain at `poetry-repository-pypi`
+
+#### Publishing a New Release
+    * Update CHANGELOG.md with details of changes and new version
+    * Run `bin/build.py`. This will extract version from CHANGELOG.md, bump version in `pyproject.toml` and generate a build for publishing
+    * Tag with new version and update the version branch:
+        * `ver=$( poetry version --short ) && echo "Version: $ver"`
+        * `git tag v/$ver`
+        * `git push --tags`
+    * To publish to test.pypi.org
+        * `poetry publish --repository testpypi`
+    * To publish to pypi.org
+        * `poetry publish`
+
+
