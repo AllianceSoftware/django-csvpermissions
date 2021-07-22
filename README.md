@@ -19,16 +19,16 @@ The `csv_permissions` model works as follows:
 
 * A CSV file that defines a permission matrix is used to define what permissions each `user_type` has
 
-### Installation
+### Quick Start
 
 In your django settings:
 
-* Add `csv_permissions` to `INSTALLED_APPS` (TODO: necessary?)
-
 * Add `csv_permissions.permissions.CSVPermissionsBackend` to `AUTHENTICATION_BACKENDS` 
   
-* Add a `CSV_PERMISSIONS_PATHS` which is an array/tuple of `str`/`pathlib.Path`
+* set `CSV_PERMISSIONS_PATHS` which is an array/tuple of `str`/`pathlib.Path`
   pointing to the CSV files you want to use to define your permissions
+  
+* Set `CSV_PERMISSIONS_RESOLVE_EVALUATORS` to `"csv_permissions.evaluators.default_resolve_evaluators"`
 
 #### Autoreload
 
@@ -39,9 +39,9 @@ You can hook into django's autoreloader to automatically reload when the CSV fil
 In one of your [django app configs](https://docs.djangoproject.com/en/dev/ref/applications/#for-application-authors):
 
 ```python
-def add_csv_permissions_watcher(sender, **kwargs):
+def add_csv_permissions_watcher(sender: django.utils.autoreload.StatReloader, **kwargs):
     """In dev we want to reload if the csv permission file changes"""
-    sender.extra_files.add(settings.CSV_PERMISSIONS_PATH)
+    sender.extra_files.add(settings.CSV_PERMISSIONS_PATHS)
 
 class MySiteAppConfig(AppConfig):
     name = "my_site"
@@ -219,7 +219,7 @@ This is not set by default as it prevents the ability to use multiple
 authentication backends for permission checks. If you are using `csv_permissions`
 exclusively for permission checks then it can be helpful to catch typos.
 
-### Permission names
+### Permission Names
 
 By default `csv_permissions` will use the same permission name format as django: `<app label>.<action>_<model>`
 
@@ -228,7 +228,7 @@ resolve permission names to whatever pattern you want.
 
 In `settings.py`:
 ```python
-CSV_PERMISSIONS_RESOLVE_PERM_NAME = 'my_site.auth.resolve_rule_name'
+CSV_PERMISSIONS_RESOLVE_PERM_NAME = 'my_site.auth.resolve_perm_name'
 ```
 
 In `my_site/auth.py`:
@@ -237,10 +237,9 @@ from typing import Optional
 from typing import Type
 
 from django.apps import AppConfig
-from django.apps import apps
 from django.db.models import Model
 
-def resolve_rule_name(app_config: AppConfig, model: Optional[Type[Model]], action: str, is_global: bool) -> str:
+def resolve_perm_name(app_config: AppConfig, model: Optional[Type[Model]], action: str, is_global: bool) -> str:
     # here's an implementation that is almost the same as django, but
     # uses - as a separator instead of _ and .
     #
@@ -251,3 +250,37 @@ def resolve_rule_name(app_config: AppConfig, model: Optional[Type[Model]], actio
         return f"{app_config.label}-{action}-{model._meta.model_name}"
 
 ```
+
+
+### Full Settings Reference
+
+**`CSV_PERMISSIONS_PATHS`**
+
+Required. List/tuple of CSV file names to use for permissions.
+
+**`CSV_PERMISSIONS_RESOLVE_EVALUATORS`**
+
+Required. A list/tuple of functions to resolve evaluators, or a string
+that will be resolved to a module attribute that is expected to contain a
+list/tuple of functions to resolve evaluators.
+
+[Details](#custom-evaluators)
+
+**`CSV_PERMISSIONS_RESOLVE_PERM_NAME`**
+
+Optional. string or function. Defaults to `'csv_permissions.permissions.default_resolve_perm_name'`.
+
+[Details](#permission-names)
+
+**`CSV_PERMISSIONS_STRICT`**
+
+Optional. boolean. Defaults to `False`.
+
+Will cause the CSVPermissionsBackend to throw an error if you try to query an
+unrecognised permission or user type.
+
+[Details](#unrecognised-permissions)
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md)

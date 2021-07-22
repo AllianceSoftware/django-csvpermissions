@@ -27,7 +27,7 @@ from .types import UnresolvedEvaluator
 from .types import UserType
 
 
-def _default_resolve_permission_name(
+def default_resolve_perm_name(
     app_config: AppConfig, model: Type[Model], action: str, is_global: bool
 ) -> str:
     if model:
@@ -186,7 +186,7 @@ def _resolve_functions(
     """
 
     if resolve_permission_name is None:
-        resolve_permission_name = _default_resolve_permission_name
+        resolve_permission_name = default_resolve_perm_name
     else:
         resolve_permission_name = import_string(resolve_permission_name)
 
