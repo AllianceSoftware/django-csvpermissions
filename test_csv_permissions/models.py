@@ -23,9 +23,6 @@ class User(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
 
-    def get_profile(self):
-        return self
-
 
 class TestModelA(models.Model):
     class Meta:

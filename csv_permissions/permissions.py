@@ -38,6 +38,10 @@ def default_resolve_perm_name(
     return permission_name
 
 
+def default_get_user_type(user: Model) -> Optional[str]:
+    return user.user_type
+
+
 def _parse_csv(
     file_path: Path,
     resolve_permission_name_func: ResolvePermNameFunc,
@@ -320,11 +324,16 @@ class CSVPermissionsBackend:
             raise ValueError(f"Permission {perm} is not known") from ke
 
     def has_perm(self, user: Model, perm: str, obj: Model) -> bool:
-        try:
-            # TODO: don't hardcode this
-            user_type = str(user.get_profile().user_type)
-        except AttributeError:
-            # Not logged in / No user profile
+        if user is None:
+            return False
+
+        get_profile_func = getattr(settings, 'CSV_PERMISSIONS_GET_USER_TYPE', default_get_user_type)
+        if isinstance(get_profile_func, str):
+            settings.CSV_PERMISSIONS_GET_USER_TYPE = import_string(settings.CSV_PERMISSIONS_GET_USER_TYPE)
+            get_profile_func = settings.CSV_PERMISSIONS_GET_USER_TYPE
+
+        user_type = get_profile_func(user)
+        if not user_type:
             return False
 
         if getattr(settings, "CSV_PERMISSIONS_STRICT", False):

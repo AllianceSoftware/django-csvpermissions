@@ -15,7 +15,7 @@ Read [Motivation / Rationale](doc/background.md) for why this project exists.
 
 The `csv_permissions` model works as follows:
 
-* Every user is expected to have a `user_type` attribute (the equivalent of `django.contrib.auth`'s `Group`)
+* Every user has a "user type" (the equivalent of `django.contrib.auth`'s `Group`)
 
 * A CSV file that defines a permission matrix is used to define what permissions each `user_type` has
 
@@ -210,6 +210,38 @@ def resolve_evaluators(details: UnresolvedEvaluator) -> Optional[Evaluator]:
 * Note that evaluator names do not have to be static strings: you could implement
     something that understood `'all_caps:True'` and `'all_caps:False'` for example
 
+### User Type
+
+The default user type is obtained from the user's `user_type` attribute.
+
+If this doesn't exist or you need custom logic then you can set
+`settings.CSV_PERMISSIONS_GET_USER_TYPE` to a function that takes a
+user and returns the user type. If the function returns `None` or an empty
+string then the user will have no permissions.
+
+Custom example where the user type field is stored on a user Profile record
+instead of the User record:
+
+In `settings.py`:
+
+```python
+CSV_PERMISSIONS_GET_USER_TYPE = 'my_site.auth.get_user_type'
+```
+
+In `my_site/auth.py`:
+
+```python
+from typing import Optional
+
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+def default_get_user_type(user: User) -> Optional[str]:
+    return user.get_attached_profile().user_type
+```
+
+
 ### Unrecognised Permissions
 
 If `settings.CSV_PERMISSIONS_STRICT` is true then querying a permission
@@ -253,6 +285,12 @@ def resolve_perm_name(app_config: AppConfig, model: Optional[Type[Model]], actio
 
 
 ### Full Settings Reference
+
+**`CSV_PERMISSIONS_GET_USER_TYPE`**
+
+Optional. Function to get the user type from a user. Defaults to returning `user.user_type`.
+
+[Details](#user-type)
 
 **`CSV_PERMISSIONS_PATHS`**
 

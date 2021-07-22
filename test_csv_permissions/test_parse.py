@@ -289,3 +289,25 @@ class CsvParsingTests(TestCase):
             with override_csv_permissions([csv_data]):
                 csv_permissions.permissions.CSVPermissionsBackend()
 
+    def test_custom_get_user_type(self):
+        csv_data = f"""
+        Model,      App,                  Action,   Is Global,  {USER1_TYPE}, {USER2_TYPE},
+        TestModelA, test_csv_permissions, foo,      yes,        yes,          ,
+        TestModelA, test_csv_permissions, bar,      yes,        ,             yes,
+        """.strip()
+
+        # we're going to use 'first_name' as the user_type
+        # and that will make user1 & user2's permissions be swapped
+        user1 = User1Factory(first_name=USER2_TYPE)
+
+        with override_csv_permissions([csv_data]):
+            self.assertTrue(user1.has_perm("test_csv_permissions.foo_testmodela"))
+            self.assertFalse(user1.has_perm("test_csv_permissions.bar_testmodela"))
+
+            def get_user_type(user):
+                return user.first_name
+
+            # and now use a different field to make user1 look like they're a USER2_TYPE
+            with override_settings(CSV_PERMISSIONS_GET_USER_TYPE=get_user_type):
+                self.assertFalse(user1.has_perm("test_csv_permissions.foo_testmodela"))
+                self.assertTrue(user1.has_perm("test_csv_permissions.bar_testmodela"))

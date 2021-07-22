@@ -35,6 +35,7 @@ so make sure you follow the template
 * Add `CSV_PERMISSIONS_STRICT` setting
 * Add support for multiple CSV files
 * Add `CSV_PERMISSIONS_RESOLVE_EVALUATORS`
+* Add `CSV_PERMISSIONS_GET_USER_TYPE`
 
 ### Changed
 * `CSV_PERMISSIONS_PATH` setting deprecated in favour of `CSV_PERMISSIONS_PATHS`
