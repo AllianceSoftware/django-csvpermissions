@@ -25,7 +25,7 @@ Django comes with a [basic permissions system](https://docs.djangoproject.com/en
 
 Default django permissions has the following tradeoffs: 
 
-* **Enumerating permssions**:
+* **Enumerating permissions**:
     The permissions attached to a user (or users that have a given permission) can be trivially enumerated with
     a single query. While django doesn't provide a view for this it is simple to make.
   

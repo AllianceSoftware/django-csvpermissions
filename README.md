@@ -26,7 +26,12 @@ In your django settings:
 * Add `csv_permissions.permissions.CSVPermissionsBackend` to `AUTHENTICATION_BACKENDS` 
   
 * set `CSV_PERMISSIONS_PATHS` which is an array/tuple of `str`/`pathlib.Path`
-  pointing to the CSV files you want to use to define your permissions
+    pointing to the CSV files you want to use to define your permissions.
+    Multiple files will be merged.
+    The CSV files order does not matter: an error will be raised if the files are
+    inconsistent.
+    If a permission or user type is missing from one CSV file then this is not considered
+    inconsistent, but a blank cell vs a filled cell is inconsistent.
   
 * Set `CSV_PERMISSIONS_RESOLVE_EVALUATORS` to `"csv_permissions.evaluators.default_resolve_evaluators"`
 
@@ -68,6 +73,9 @@ Model,     App,           Action,            Is Global, admin, assistant, custom
 
 # Comment lines and blank lines will be ignored
 
+# The horizontal column alignment is just for readability:
+#  leading/trailing spaces will be stripped from each cell
+
 Publisher, library,       add,               yes,       yes,
 Publisher, library,       view,              no,        all,
 Publisher, library,       change,            no,        all,
@@ -79,7 +87,7 @@ Book,      library,       change,            no,        all,   all,
 Book,      library,       delete,            no,        all,   all,
 
 Loan,      library,       add,               yes,       yes,   yes,       yes,
-Loan,      library,       view,              no,        all,   all,       own,
+Loan,      library,       view,              no,        all,   all,
 Loan,      library,       change,            no,        all,   all,
 Loan,      library,       delete,            no,        all,   all,
 
@@ -89,7 +97,8 @@ Loan,      library,       delete,            no,        all,   all,
 ,          library,       report_popularity, yes,      yes,   yes,
 ```
 
-The first 4 columns define the permission details:
+The first 4 columns define the permission details.
+These will be used to resolve the permission code name (see [Permission Names](#permission-names)). 
 
 **Model** is used to resolve the permission name but is otherwise not used. There is no checks that objects passed to the `has_perm()` actually match the correct type.
 
@@ -97,18 +106,22 @@ The first 4 columns define the permission details:
 
 **Action** is an arbitrary identifier that is used to resolve the permission name.
 
-**Is Global** whether the permission is global or per-object (see "Global Permission" section below)
+**Is Global** whether the permission is global or per-object (see "Global Permission" section below).
+    Right now you must provide a model if `Is Global` is false however this restriction may be
+    relaxed in future. 
 
 **Evaluators**
 
-The next columns define permission "evaluators".
+The next columns define permission "evaluators" for each [user type](#user-type)
 
 Built-in evaluators are:
 
-* `all` - user has permission for all objects. Will raise an error  if an object is not passed to `has_perm()`
+* `all` - user has permission for all objects. Will raise an error if an object is not passed to `has_perm()`
 * `yes` - user has permission globally. Will raise an error if an object is passed to `has_perm()`.
 * (empty cell) -- user does not have permission (global or per-object) 
 
+The distinction between `all` and `yes` is that `all` is a per-object
+permission and `yes` is a [global permission](#global-permissions). 
 
 ### Global Permissions
 
@@ -134,7 +147,7 @@ print(
 
 ### Custom Evaluators
 
-By default putting other than a built-in evaluator in a CSV permissions file
+By default putting anything other than a built-in evaluator in a CSV permissions file
 will raise an error.
 
 You add your own permission evaluators by defining "evaluator resolver"
@@ -161,7 +174,7 @@ CSV_PERMISSIONS_RESOLVE_EVALUATORS = (
 )
 
 # if you don't have any customisations you can point to a list/tuple
-# that is defined elsewhere; this is a basic set:
+# that is defined elsewhere; if you don't set it then this is the default setting:
 #CSV_PERMISSIONS_RESOLVE_EVALUATORS = "csv_permissions.evaluators.default_resolve_evaluators"
 
 # for compatibility with csv_permissions 0.1.0
@@ -202,7 +215,7 @@ def resolve_evaluators(details: UnresolvedEvaluator) -> Optional[Evaluator]:
     if details.evaluator_name == "all_caps":
         if details.is_global != False:
             raise ValueError("'all_caps' cannot be used as a global permission.")
-        return evaluate_if_monday
+        return evaluate_all_caps
 
     return None
 ```
@@ -211,6 +224,10 @@ def resolve_evaluators(details: UnresolvedEvaluator) -> Optional[Evaluator]:
     something that understood `'all_caps:True'` and `'all_caps:False'` for example
 
 ### User Type
+
+User Types are the `csv_permissions` equivalent of django's user Group.
+A user has a single user type, and from that is granted the set of permissions
+that this user type has in the CSV file.
 
 The default user type is obtained from the user's `user_type` attribute.
 
@@ -238,7 +255,11 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 def default_get_user_type(user: User) -> Optional[str]:
-    return user.get_attached_profile().user_type
+    try:
+        return user.get_attached_profile().user_type
+    except AttributeError:
+        # could be an AnonymousUser 
+        return None
 ```
 
 
@@ -275,9 +296,9 @@ def resolve_perm_name(app_config: AppConfig, model: Optional[Type[Model]], actio
     # here's an implementation that is almost the same as django, but
     # uses - as a separator instead of _ and .
     #
-    # we also need to handle with the case where a permission has no associated model
+    # we also need to handle the case where a permission has no associated model
     if model is None:
-        f"{app_config.label}-{action}"
+        return f"{app_config.label}-{action}"
     else:
         return f"{app_config.label}-{action}-{model._meta.model_name}"
 
