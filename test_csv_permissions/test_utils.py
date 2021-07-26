@@ -1,10 +1,6 @@
-import contextlib
-import tempfile
 from typing import Dict
-from typing import Iterable
 import warnings
 
-from django.test import override_settings
 from django.test.utils import TestContextDecorator
 
 from test_csv_permissions.factory import UserFactory
@@ -20,25 +16,6 @@ def User1Factory(**kwargs):
 
 def User2Factory(**kwargs):
     return UserFactory.create(user_type=USER2_TYPE, **kwargs)
-
-
-@contextlib.contextmanager
-def override_csv_permissions(csv_datas: Iterable[str]):
-    """
-    Creates temporary CSV files with the specified contents and then sets the
-    """
-
-    csv_filepaths = []
-
-    with contextlib.ExitStack() as stack:
-        for csv_data in csv_datas:
-            f = stack.enter_context(tempfile.NamedTemporaryFile("w"))
-            csv_filepaths.append(f.name)
-            f.writelines(csv_data)
-            f.seek(0)
-
-        with override_settings(CSV_PERMISSIONS_PATHS=csv_filepaths):
-            yield
 
 
 class warning_filter(TestContextDecorator):

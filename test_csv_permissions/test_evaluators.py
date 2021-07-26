@@ -7,10 +7,10 @@ from django.test import TestCase
 import csv_permissions.evaluators
 import csv_permissions.legacy
 import csv_permissions.permissions
+from csv_permissions.test_utils import override_csv_permissions
 
 from .models import TestModelA
 from .models import TestModelD
-from .test_utils import override_csv_permissions
 from .test_utils import USER1_TYPE
 from .test_utils import User1Factory
 from .test_utils import USER2_TYPE
