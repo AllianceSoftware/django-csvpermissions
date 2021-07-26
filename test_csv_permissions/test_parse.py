@@ -281,11 +281,11 @@ class CsvParsingTests(TestCase):
 
     def test_duplicate_header(self):
         csv_data = f"""
-        Model,      App,                  Action,   Is Global,  {USER1_TYPE}, {USER1_TYPE},
-        TestModelA, test_csv_permissions, foo,      yes,        yes,          yes,
+        Model,      App,                  Action,   Is Global,  , {USER1_TYPE}, {USER1_TYPE}, ,
+        TestModelA, test_csv_permissions, foo,      yes,        , yes,          yes,          ,
         """.strip()
 
-        with self.assertRaisesRegex(ValueError, 'Duplicate'):
+        with self.assertRaisesRegex(ValueError, f'Duplicate.*{USER1_TYPE}'):
             with override_csv_permissions([csv_data]):
                 csv_permissions.permissions.CSVPermissionsBackend()
 

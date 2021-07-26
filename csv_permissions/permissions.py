@@ -98,7 +98,8 @@ def _parse_csv(
 
         nonempty_user_type_headers = [user_type for user_type in user_type_headers if user_type != ""]
         if len(set(nonempty_user_type_headers)) != len(nonempty_user_type_headers):
-            raise ValueError(f"Duplicate csv_permissions CSV column headers found in {file_path}")
+            duplicates = [x for x in nonempty_user_type_headers if nonempty_user_type_headers.count(x) >= 2]
+            raise ValueError(f"Duplicate csv_permissions CSV column header ({duplicates[0]}) found in {file_path}")
 
         if len(nonempty_user_type_headers) == 0:
             raise ValueError(f"Missing user_type headers in {file_path}")
