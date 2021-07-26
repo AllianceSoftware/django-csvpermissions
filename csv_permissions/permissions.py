@@ -86,6 +86,7 @@ def _parse_csv(
 
         # get first row of headers
         fieldnames = next(reader)
+        fieldnames = [x.strip() for x in fieldnames]
 
         prelim_headers = ["Model", "App", "Action", "Is Global"]
         prelim_header_count = len(prelim_headers)
@@ -110,8 +111,10 @@ def _parse_csv(
         was_empty = True
 
         for line_number, row in enumerate(reader):
+            row = [cell.strip() for cell in row]
+
             was_empty = False
-            if all(x is None or x.strip() == "" for x in row):
+            if all(x == "" for x in row):
                 # ignore completely empty rows
                 continue
 
