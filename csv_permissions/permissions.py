@@ -133,7 +133,7 @@ def _parse_csv(
             elif is_global == "no":
                 is_global = False
             else:
-                raise ValueError("Invalid value for Is Global.")
+                raise ValueError("Invalid value for Is Global: should be 'yes' or 'no'.")
 
             permission = resolve_permission_name_func(app_config, model, action, is_global)
 
@@ -170,7 +170,7 @@ def _parse_csv(
 # should be at least as large as the number of CSV files we load. This gets called by every has_perm() so must be cached
 @lru_cache(maxsize=32)
 def _resolve_functions(
-    file_paths: Tuple[Path, ...],
+    file_paths: Iterable[Path],
     resolve_permission_name: Optional[str],
     resolve_evaluators: Iterable[Union[str, ResolveEvaluatorFunc]],
 ) -> Tuple[
@@ -180,8 +180,9 @@ def _resolve_functions(
     Set[str]
 ]:
     """
-    :param file_path: Path to the CSV from which to import.
+    :param file_paths: Path to the CSV files to read.
     :resolve_permission_name: the settings.CSV_PERMISSIONS_RESOLVE_PERM_NAME setting.
+    :resolve_evaluators: the settings.CSV_PERMISSIONS_RESOLVE_EVALUATORS setting.
     :return: A tuple of:
             - dictionary mapping the permissions for each UserType to a function determining if the user has access.
             - dictionary mapping the permission to a boolean indicating whether the permission is object level or global level.

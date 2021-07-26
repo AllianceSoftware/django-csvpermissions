@@ -38,8 +38,6 @@ _PREDEFINED_ACTION_IS_GLOBAL = {
 
 
 def resolve_legacy_validate_global_evaluator(details: UnresolvedEvaluator) -> Optional[Evaluator]:
-    global _PREDEFINED_ACTION_IS_GLOBAL
-
     if _PREDEFINED_ACTION_IS_GLOBAL.get(details.action, details.is_global) != details.is_global:
         model_name = None if details.model is None else details.model._meta.model_name
         raise ValueError(
