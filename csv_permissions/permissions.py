@@ -39,7 +39,8 @@ def default_resolve_perm_name(
 
 
 def default_get_user_type(user: Model) -> Optional[str]:
-    return user.user_type
+    # note that AnonymousUser won't have a user_type so we need to deal with that gracefully
+    return getattr(user, "user_type", None)
 
 
 def _parse_csv(
@@ -338,7 +339,9 @@ class CSVPermissionsBackend:
             get_profile_func = settings.CSV_PERMISSIONS_GET_USER_TYPE
 
         user_type = get_profile_func(user)
-        if not user_type:
+        if user_type is None:
+            # if there is no user_type then it's probably an AnonymousUser, but might also be a
+            # user using a different permissions backend; either way they're not covered by csv_permissions
             return False
 
         if getattr(settings, "CSV_PERMISSIONS_STRICT", False):

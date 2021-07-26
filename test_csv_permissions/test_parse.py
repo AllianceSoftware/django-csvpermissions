@@ -1,6 +1,7 @@
 from typing import Type
 
 from django.apps import AppConfig
+from django.contrib.auth.models import AnonymousUser
 from django.db.models import Model
 from django.test import override_settings
 from django.test import TestCase
@@ -267,7 +268,23 @@ class CsvParsingTests(TestCase):
                     user_empty.has_perm("test_csv_permissions.foo_testmodela")
 
             with override_settings(CSV_PERMISSIONS_STRICT=False):
+
                 self.assertFalse(user_empty.has_perm("test_csv_permissions.foo_testmodela"))
+
+    def test_anonymous_user(self):
+        csv_data = f"""
+        Model,      App,                  Action,   Is Global,  , {USER1_TYPE},
+        TestModelA, test_csv_permissions, foo,      yes,        ,  yes,
+        """.strip()
+
+        user = AnonymousUser()
+
+        with override_csv_permissions([csv_data]):
+            with override_settings(CSV_PERMISSIONS_STRICT=True):
+                self.assertFalse(user.has_perm("test_csv_permissions.foo_testmodela"))
+
+            with override_settings(CSV_PERMISSIONS_STRICT=False):
+                self.assertFalse(user.has_perm("test_csv_permissions.foo_testmodela"))
 
     def test_empty_user_type_not_empty_column(self):
         csv_data = f"""

@@ -258,7 +258,9 @@ def default_get_user_type(user: User) -> Optional[str]:
     try:
         return user.get_attached_profile().user_type
     except AttributeError:
-        # could be an AnonymousUser 
+        # user might be an AnonymousUser
+        # user_type==None will be treated as a user with no permissions
+        # if you do want to grant AnonymousUser selective permissions then return a placeholder string
         return None
 ```
 
