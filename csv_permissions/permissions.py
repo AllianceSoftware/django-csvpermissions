@@ -333,12 +333,12 @@ class CSVPermissionsBackend:
         if user is None:
             return False
 
-        get_profile_func = getattr(settings, 'CSV_PERMISSIONS_GET_USER_TYPE', default_get_user_type)
-        if isinstance(get_profile_func, str):
+        get_user_type = getattr(settings, 'CSV_PERMISSIONS_GET_USER_TYPE', default_get_user_type)
+        if isinstance(get_user_type, str):
             settings.CSV_PERMISSIONS_GET_USER_TYPE = import_string(settings.CSV_PERMISSIONS_GET_USER_TYPE)
-            get_profile_func = settings.CSV_PERMISSIONS_GET_USER_TYPE
+            get_user_type = settings.CSV_PERMISSIONS_GET_USER_TYPE
 
-        user_type = get_profile_func(user)
+        user_type = get_user_type(user)
         if user_type is None:
             # if there is no user_type then it's probably an AnonymousUser, but might also be a
             # user using a different permissions backend; either way they're not covered by csv_permissions
