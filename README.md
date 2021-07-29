@@ -348,6 +348,12 @@ See [CHANGELOG.md](CHANGELOG.md)
 
 ## Development
 
+Note that due to pip/poetry/distutils issues you can't easily install dev versions directly from github with pip (works fine with poetry though)
+* https://github.com/python-poetry/poetry/issues/761#issuecomment-521124268
+    * proposed solution appears to work but actually installs the package as "UNKNOWN"
+* https://github.com/python-poetry/poetry/issues/3153#issuecomment-727196619
+    * dephell might have worked but there's no homebrew package & it's no longer maintained
+
 ### Release Process
 
 #### Poetry Config
