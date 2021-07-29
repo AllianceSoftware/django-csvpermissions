@@ -54,23 +54,8 @@ def _parse_csv(
     """
     Parses the CSV of user_type permissions returns data for further processing.
 
-    CSV file format:
-        entity, app_name, permission_name, is_global, user_type1, user_type2, .. user_typeN
+    See README.md for the CSV file format
 
-    The possible values for permissions are:
-        '' (no permission)
-        'yes' (has permission)
-        'own: some_func' record is part of that user's permission scope. some_func takes a record
-              and returns true/false according to whether the user should have access or not. The
-              specifics of how this works are dependent on the application. Functionally this is
-              identical to 'custom' but is different in that it relates to multi-tenant applications
-              rather than some other arbitrary business rule.
-        'all' (has permission with no additional requirements)
-        'custom: name_of_custom_rule_function' (has permission as defined by name_of_custom_rule_function)
-
-    :param file_path: Path to the CSV from which to import.
-    :param resolve_permission_name_func: function to resolve permission names (the function pointed to by
-        settings.CSV_PERMISSIONS_RESOLVE_PERM_NAME)`
     :return: A tuple of three elements:
         - A dict mapping permission name to bool of whether that permission is global or not
         - A dict mapping a permission to a dict of user_types to partially resolved permission details:
