@@ -9,7 +9,7 @@ from csv_permissions.evaluators import resolve_all_evaluator
 from csv_permissions.evaluators import resolve_empty_evaluator
 from csv_permissions.evaluators import resolve_fallback_not_implemented_evaluator
 from csv_permissions.evaluators import resolve_no_evaluator
-from csv_permissions.evaluators import resolve_validation_evaluator
+from csv_permissions.evaluators import resolve_validate_is_global_model
 from csv_permissions.evaluators import resolve_yes_evaluator
 from csv_permissions.types import Evaluator
 from csv_permissions.types import UnresolvedEvaluator
@@ -117,7 +117,7 @@ def resolve_custom_evaluator(details: UnresolvedEvaluator) -> Optional[Evaluator
 resolve_evaluators = (
     resolve_legacy_warning_evaluator,
     resolve_legacy_validate_global_evaluator,
-    resolve_validation_evaluator,
+    resolve_validate_is_global_model,
     resolve_own_evaluator,
     resolve_custom_evaluator,
     resolve_all_evaluator,

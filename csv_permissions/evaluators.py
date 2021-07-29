@@ -13,9 +13,10 @@ def make_evaluate_not_implemented(message) -> Evaluator:
     return evaluate_not_implemented
 
 
-def resolve_validation_evaluator(details: UnresolvedEvaluator) -> Optional[Evaluator]:
+def resolve_validate_is_global_model(details: UnresolvedEvaluator) -> Optional[Evaluator]:
     """
-    This doesn't actually resolve to any evaluators, it just performs some validation
+    This doesn't actually resolve to any evaluators, it just validates that
+    is_global=False permissions have a model
     """
     if details.model is None and not details.is_global:
         raise ValueError("Permissions without Models must be global.")
@@ -74,7 +75,7 @@ def resolve_fallback_not_implemented_evaluator(details: UnresolvedEvaluator) -> 
 
 
 default_resolve_evaluators = (
-    resolve_validation_evaluator,
+    resolve_validate_is_global_model,
     resolve_all_evaluator,
     resolve_yes_evaluator,
     resolve_no_evaluator,

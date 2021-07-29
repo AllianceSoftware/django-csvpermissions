@@ -30,7 +30,7 @@ def custom_resolve_perm_name(app_config: AppConfig, model: Type[Model], action: 
 @override_settings(
     CSV_PERMISSIONS_STRICT=True,
     CSV_PERMISSIONS_RESOLVE_EVALUATORS=[
-        csv_permissions.evaluators.resolve_validation_evaluator,
+        csv_permissions.evaluators.resolve_validate_is_global_model,
         csv_permissions.evaluators.resolve_all_evaluator,
         csv_permissions.evaluators.resolve_yes_evaluator,
         csv_permissions.evaluators.resolve_no_evaluator,

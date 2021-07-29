@@ -163,8 +163,8 @@ next resolver in the list will be called.
 ```python
 # in settings.py
 CSV_PERMISSIONS_RESOLVE_EVALUATORS = (
-    # sanity checks
-    'csv_permissions.evaluators.resolve_validation_evaluator',
+    # sanity check that non-global permissions have a model
+    'csv_permissions.evaluators.resolve_validate_is_global_model',
     # custom validators (examples below)
     'my_app.evaluators.resolve_evaluators',
     # 'all'/'yes'/'no' 
