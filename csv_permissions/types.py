@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+import dataclasses
+from pathlib import Path
 from typing import Callable
 from typing import Optional
 from typing import Type
@@ -19,7 +20,7 @@ Evaluator = Callable[[Model, Optional[Model]], bool]
 ResolvePermNameFunc = Callable[[AppConfig, Type[Model], str, bool], str]
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class UnresolvedEvaluator:
     """This is a placeholder for a cell in a CSV file that has been
     read but not yet resolved to the evaluator function"""
@@ -29,6 +30,15 @@ class UnresolvedEvaluator:
     permission: PermName
     action: str
     evaluator_name: str
+    source_csv: Path
+
+    def __eq__(self, other):
+        # when doing a comparison we want to ignore the source file:
+        # it's only used for error reporting purposes
+        return (
+            {**self.__dict__, "source_csv": None} ==
+            {**other.__dict__, "source_csv": None}
+        )
 
 
 # function to resolve an evaluator function

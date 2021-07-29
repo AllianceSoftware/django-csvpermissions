@@ -149,6 +149,7 @@ def _parse_csv(
                         permission=permission,
                         action=action,
                         evaluator_name=evaluator_name,
+                        source_csv=file_path,
                     )
 
         if was_empty:
@@ -192,6 +193,7 @@ def _resolve_functions(
     )
 
     permission_is_global: Dict[PermName, bool] = {}
+    permission_is_global_source_csv: Dict[PermName, Path] = {}
 
     known_user_types: Set[UserType] = set()
     known_perms: Set[PermName] = set()
@@ -209,8 +211,15 @@ def _resolve_functions(
         # merge is_global settings
         for permission, is_global in file_permission_is_global.items():
             if permission in permission_is_global and permission_is_global[permission] != is_global:
-                raise ValueError(f"'Is Global' for {permission} in {file_path} is inconsistent with a previous CSV file")
+                # we don't specifically keep track of which previous file set the is_global;
+                # look back through all of the unresolved permissions to find where it came from
+                # (this is slowish but only happens in the failure case)
+                raise ValueError(
+                    f"'Is Global' for {permission} in {file_path} is inconsistent "
+                    f"with a previous CSV file ({permission_is_global_source_csv[permission]})"
+                )
         permission_is_global.update(file_permission_is_global)
+        permission_is_global_source_csv.update({perm: file_path for perm in file_permission_is_global.keys()})
 
         # merge unresolved permissions
         for permission, new_user_type_to_unresolved in new_permission_to_user_type_to_unresolved.items():
@@ -218,10 +227,12 @@ def _resolve_functions(
                 permission_to_user_type_to_unresolved[permission] = {}
             for user_type, new_unresolved in new_user_type_to_unresolved.items():
                 if user_type in permission_to_user_type_to_unresolved[permission]:
-                    if new_unresolved != permission_to_user_type_to_unresolved[permission][user_type]:
+                    existing_unresolved = permission_to_user_type_to_unresolved[permission][user_type]
+                    if new_unresolved != existing_unresolved:
                         raise ValueError(
                             f"Permission {permission} for user type {user_type} in "
-                            f"{file_path} is inconsistent with a previous CSV file"
+                            f"{file_path} is inconsistent with a previous CSV file "
+                            f"({existing_unresolved.source_csv})"
                         )
                 else:
                     permission_to_user_type_to_unresolved[permission][user_type] = new_unresolved
