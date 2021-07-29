@@ -115,7 +115,7 @@ class CsvParsingTests(TestCase):
     @override_settings(CSV_PERMISSIONS_STRICT=False)
     def test_ignored_lines(self):
         """
-        Test that commented out lines are ignored
+        Test that commented out & blank lines are ignored
         """
         csv_header_data = f"""
         Model,      App,                  Action,   Is Global,  {USER1_TYPE},
@@ -124,17 +124,32 @@ class CsvParsingTests(TestCase):
         csv_bad_line = "blah blah blah"
         user = User1Factory()
 
-        with override_csv_permissions([csv_header_data + "\n" * 3 + "#" + csv_bad_line]):
-            self.assertFalse(user.has_perm("test_csv_permissions.approve_testmodela", None))
-
+        # an actual bad line
         with self.assertRaisesRegex(ValueError, 'Incomplete'):
             with override_csv_permissions([csv_header_data + "\n" * 3 + csv_bad_line]):
                 self.assertFalse(user.has_perm("test_csv_permissions.approve_testmodela", None))
 
+        # comment beginning with #
+        with override_csv_permissions([csv_header_data + "\n" * 3 + "#" + csv_bad_line]):
+            self.assertFalse(user.has_perm("test_csv_permissions.approve_testmodela", None))
+
+        # comment beginning with //
         with override_csv_permissions([csv_header_data + "\n" * 3 + "//" + csv_bad_line]):
             self.assertFalse(user.has_perm("test_csv_permissions.approve_testmodela", None))
 
-        pass
+        # comment beginning with ;
+        with override_csv_permissions([csv_header_data + "\n" * 3 + ";" + csv_bad_line]):
+            self.assertFalse(user.has_perm("test_csv_permissions.approve_testmodela", None))
+
+        # lines with too few / too many blank cells
+        csv_data = f'''
+        {csv_header_data}
+        
+        ,,
+        ,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+        '''
+        with override_csv_permissions([csv_data]):
+            self.assertFalse(user.has_perm("test_csv_permissions.approve_testmodela", None))
 
     def test_misconfigured_object_permission_error(self):
         """

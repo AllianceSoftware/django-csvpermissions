@@ -120,7 +120,7 @@ def _parse_csv(
                 # ignore completely empty rows
                 continue
 
-            if any(row[0].strip().startswith(comment_prefix) for comment_prefix in ("//", "#")):
+            if any(row[0].strip().startswith(comment_prefix) for comment_prefix in ("//", "#", ';')):
                 # Ignore lines beginning with comment chars
                 continue
 
