@@ -54,6 +54,12 @@ def evaluate_no(user, obj=None) -> bool:
     return False
 
 
+def resolve_no_evaluator(details: UnresolvedEvaluator) -> Optional[Evaluator]:
+    if details.evaluator_name == "no":
+        return evaluate_no
+    return None
+
+
 def resolve_empty_evaluator(details: UnresolvedEvaluator) -> Optional[Evaluator]:
     if details.evaluator_name == "":
         return evaluate_no
@@ -71,6 +77,7 @@ default_resolve_evaluators = (
     resolve_validation_evaluator,
     resolve_all_evaluator,
     resolve_yes_evaluator,
+    resolve_no_evaluator,
     resolve_empty_evaluator,
     resolve_fallback_not_implemented_evaluator,
 )

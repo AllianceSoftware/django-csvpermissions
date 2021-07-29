@@ -8,6 +8,7 @@ from csv_permissions.evaluators import make_evaluate_not_implemented
 from csv_permissions.evaluators import resolve_all_evaluator
 from csv_permissions.evaluators import resolve_empty_evaluator
 from csv_permissions.evaluators import resolve_fallback_not_implemented_evaluator
+from csv_permissions.evaluators import resolve_no_evaluator
 from csv_permissions.evaluators import resolve_validation_evaluator
 from csv_permissions.evaluators import resolve_yes_evaluator
 from csv_permissions.types import Evaluator
@@ -121,6 +122,7 @@ resolve_evaluators = (
     resolve_custom_evaluator,
     resolve_all_evaluator,
     resolve_yes_evaluator,
+    resolve_no_evaluator,
     resolve_empty_evaluator,
     resolve_fallback_not_implemented_evaluator,
 )

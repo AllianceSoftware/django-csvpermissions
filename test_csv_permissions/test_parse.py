@@ -33,6 +33,7 @@ def custom_resolve_perm_name(app_config: AppConfig, model: Type[Model], action: 
         csv_permissions.evaluators.resolve_validation_evaluator,
         csv_permissions.evaluators.resolve_all_evaluator,
         csv_permissions.evaluators.resolve_yes_evaluator,
+        csv_permissions.evaluators.resolve_no_evaluator,
         csv_permissions.evaluators.resolve_empty_evaluator,
         csv_permissions.evaluators.resolve_fallback_not_implemented_evaluator
     ],
@@ -209,6 +210,9 @@ class CsvParsingTests(TestCase):
 
         csv_data3 = f"""
         Model,      App,                  Action,   Is Global,  {USER1_TYPE}, {USER2_TYPE},
+        # empty cells will merge with those from other files 
+        TestModelA, test_csv_permissions, view,     no,         ,
+        TestModelB, test_csv_permissions, add,      yes,        ,
         TestModelD, test_csv_permissions, add,      yes,        yes,          yes,
         """.strip()
 
@@ -229,6 +233,26 @@ class CsvParsingTests(TestCase):
             self.assertTrue(user1.has_perm("test_csv_permissions.add_testmodeld"))
             self.assertTrue(user2.has_perm("test_csv_permissions.add_testmodeld"))
 
+        # if we remove the empty evaluator and set strict then undefined cells should
+        # be an error
+        evaluators = tuple(
+            e
+            for e
+            in csv_permissions.evaluators.default_resolve_evaluators
+            if e != csv_permissions.evaluators.resolve_empty_evaluator
+        )
+        with override_settings(
+            CSV_PERMISSIONS_STRICT=True,
+            CSV_PERMISSIONS_RESOLVE_EVALUATORS=evaluators,
+        ):
+            with override_csv_permissions([csv_data1, csv_data2, csv_data3]):
+                # this cell is present and empty
+                with self.assertRaises(NotImplementedError):
+                    user2.has_perm("test_csv_permissions.add_testmodelb")
+
+                # this cell is not present anywhere
+                self.assertFalse(user1.has_perm("test_csv_permissions.add_testmodelc"))
+
     def test_multiple_csv_files_inconsistent_is_global(self):
         csv_data1 = f"""
         Model,      App,                  Action,   Is Global,  {USER1_TYPE},
@@ -242,8 +266,12 @@ class CsvParsingTests(TestCase):
 
         user1 = User1Factory()
 
-        with self.assertRaisesRegex(ValueError, 'inconsistent with a previous CSV file'):
-            with override_csv_permissions([csv_data1, csv_data2]):
+        with override_csv_permissions([csv_data1, csv_data2]) as csv_files:
+            error_message = (
+                f"'Is Global' for test_csv_permissions.foo_testmodela in {csv_files[1]} is inconsistent "
+                f"with a previous CSV file ({csv_files[0]})"
+            )
+            with self.assertRaisesMessage(ValueError, error_message):
                 user1.has_perm("test_csv_permissions.foo_testmodela")
 
     def test_multiple_csv_files_inconsistent_details(self):
@@ -254,7 +282,7 @@ class CsvParsingTests(TestCase):
 
         csv_data2 = f"""
         Model,      App,                  Action,   Is Global,  {USER1_TYPE},
-        TestModelA, test_csv_permissions, foo,      yes,        ,
+        TestModelA, test_csv_permissions, foo,      yes,        no,
         """.strip()
 
         user1 = User1Factory()
@@ -264,9 +292,16 @@ class CsvParsingTests(TestCase):
             self.assertTrue(user1.has_perm("test_csv_permissions.foo_testmodela"))
 
         # inconsistent CSV files
-        with self.assertRaisesRegex(ValueError, 'inconsistent with a previous CSV file'):
-            with override_csv_permissions([csv_data1, csv_data2]):
+        with override_csv_permissions([csv_data1, csv_data2]) as csv_files:
+            error_message = (
+                f"Permission test_csv_permissions.foo_testmodela for user type {USER1_TYPE} in "
+                f"{csv_files[1]} is inconsistent with a previous CSV file "
+                f"({csv_files[0]})"
+            )
+            with self.assertRaisesMessage(ValueError, error_message):
+                # something that's explicitly set
                 csv_permissions.permissions.CSVPermissionsBackend()
+                self.assertTrue(user1.has_perm("test_csv_permissions.foo_testmodela"))
 
     def test_empty_user_type(self):
         csv_data = f"""
@@ -286,7 +321,6 @@ class CsvParsingTests(TestCase):
                     user_empty.has_perm("test_csv_permissions.foo_testmodela")
 
             with override_settings(CSV_PERMISSIONS_STRICT=False):
-
                 self.assertFalse(user_empty.has_perm("test_csv_permissions.foo_testmodela"))
 
     def test_anonymous_user(self):

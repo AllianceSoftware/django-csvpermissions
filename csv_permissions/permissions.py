@@ -226,16 +226,28 @@ def _resolve_functions(
             if permission not in permission_to_user_type_to_unresolved:
                 permission_to_user_type_to_unresolved[permission] = {}
             for user_type, new_unresolved in new_user_type_to_unresolved.items():
-                if user_type in permission_to_user_type_to_unresolved[permission]:
+                if user_type not in permission_to_user_type_to_unresolved[permission]:
+                    permission_to_user_type_to_unresolved[permission][user_type] = new_unresolved
+                else:
+                    # both the new and an older CSV file include this cell
                     existing_unresolved = permission_to_user_type_to_unresolved[permission][user_type]
-                    if new_unresolved != existing_unresolved:
+                    if new_unresolved == existing_unresolved:
+                        # they are the same so do nothing (leaves the old one in place)
+                        pass
+                    elif existing_unresolved.evaluator_name == "":
+                        # old CSV cell was empty, use new one
+                        permission_to_user_type_to_unresolved[permission][user_type] = new_unresolved
+                    elif new_unresolved.evaluator_name == "":
+                        # new CSV cell is empty, use old one
+                        pass
+                    else:
+                        # they were not the same and neither was empty. This means they're inconsistent
                         raise ValueError(
                             f"Permission {permission} for user type {user_type} in "
                             f"{file_path} is inconsistent with a previous CSV file "
                             f"({existing_unresolved.source_csv})"
                         )
-                else:
-                    permission_to_user_type_to_unresolved[permission][user_type] = new_unresolved
+
 
     # now take the partially resolved functions and resolve them
     permission_to_user_type_to_evaluator: Dict[PermName, Dict[UserType, Evaluator]] = {}

@@ -76,22 +76,23 @@ Model,     App,           Action,            Is Global, admin, assistant, custom
 # The horizontal column alignment is just for readability:
 #  leading/trailing spaces will be stripped from each cell
 
-Publisher, library,       add,               yes,       yes,
-Publisher, library,       view,              no,        all,
-Publisher, library,       change,            no,        all,
-Publisher, library,       delete,            no,        all,
+Publisher, library,       add,               yes,       yes,   no,        no
+Publisher, library,       view,              no,        all,   no,        no
+Publisher, library,       change,            no,        all,   no,        no
+Publisher, library,       delete,            no,        all,   no,        no
 
-Book,      library,       add,               yes,       yes,   yes,
-Book,      library,       view,              no,        all,   all,
-Book,      library,       change,            no,        all,   all,
-Book,      library,       delete,            no,        all,   all,
+Book,      library,       add,               yes,       yes,   yes,       no
+Book,      library,       view,              no,        all,   all,       no
+Book,      library,       change,            no,        all,   all,       no
+Book,      library,       delete,            no,        all,   all,       no
 
-Loan,      library,       add,               yes,       yes,   yes,       yes,
-Loan,      library,       view,              no,        all,   all,
-Loan,      library,       change,            no,        all,   all,
-Loan,      library,       delete,            no,        all,   all,
+Loan,      library,       add,               yes,       yes,   yes,       yes
+Loan,      library,       view,              no,        all,   all,       no
+Loan,      library,       change,            no,        all,   all,       no
+Loan,      library,       delete,            no,        all,   all,       no
 
-# The model column can be blank:
+# The model column can be blank. Note that the customer column here is also
+# empty; see below for the difference between this and "no"
 
 ,          library,       report_outstanding,yes,      yes,   yes,
 ,          library,       report_popularity, yes,      yes,   yes,
@@ -118,7 +119,11 @@ Built-in evaluators are:
 
 * `all` - user has permission for all objects. Will raise an error if an object is not passed to `has_perm()`
 * `yes` - user has permission globally. Will raise an error if an object is passed to `has_perm()`.
-* (empty cell) -- user does not have permission (global or per-object) 
+* `no` -- user does not have permission (global or per-object)
+* (empty cell) -- user permission is not defined.
+    If another CSV file defines this user/permission pair then that will be used.
+    If no CSV file defines this user/permission pair then the evaluator will be
+    treated as `""` and by default the `resolve_empty_evaluator` will treat this as no permission granted. 
 
 The distinction between `all` and `yes` is that `all` is a per-object
 permission and `yes` is a [global permission](#global-permissions). 
@@ -162,9 +167,15 @@ CSV_PERMISSIONS_RESOLVE_EVALUATORS = (
     'csv_permissions.evaluators.resolve_validation_evaluator',
     # custom validators (examples below)
     'my_app.evaluators.resolve_evaluators',
-    # 'all'/'yes'/'' 
+    # 'all'/'yes'/'no' 
     'csv_permissions.evaluators.resolve_all_evaluator',
     'csv_permissions.evaluators.resolve_yes_evaluator',
+    'csv_permissions.evaluators.resolve_no_evaluator',
+    # If you remove the empty evaluator then "" will fall through to the
+    # remaining evaluator(s). This can be used in combination with
+    # CSV_PERMISSIONS_STRICT to ensure that there are no blank cells in a CSV
+    # file. Note that cells not present in any file due to different headers
+    # still won't be processed.     
     'csv_permissions.evaluators.resolve_empty_evaluator',
     # normally if nothing matches an exception will be thrown however it 
     # can be more convenient (especially in early phases of development )
