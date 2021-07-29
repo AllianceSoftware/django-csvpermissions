@@ -273,14 +273,13 @@ class CSVPermissionsBackend:
             except AttributeError:
                 raise ImproperlyConfigured("csv_permissions requires settings.CSV_PERMISSIONS_PATHS to be set")
             else:
-                warnings.warn(
-                    "settings.CSV_PERMISSIONS_PATH is deprecated in favor of settings.CSV_PERMISSIONS_PATHS",
-                    DeprecationWarning
-                )
                 permissions_paths = settings.CSV_PERMISSIONS_PATHS
+                del settings.CSV_PERMISSIONS_PATH
 
-        # make sure it's always a tuple so that it's hashable and _resolve_functions() can have @lru_cache() applied
+        # make sure it's immutable so that it's hashable and _resolve_functions() can have @lru_cache() applied
         if not isinstance(permissions_paths, tuple):
+            if isinstance(permissions_paths, (str, Path)):
+                raise ImproperlyConfigured("settings.CSV_PERMISSIONS_PATHS should be an iterable of paths")
             permissions_paths = tuple(permissions_paths)
             settings.CSV_PERMISSIONS_PATHS = permissions_paths
 

@@ -317,9 +317,12 @@ Optional. Function to get the user type from a user. Defaults to returning `user
 
 [Details](#user-type)
 
-**`CSV_PERMISSIONS_PATHS`**
+**`CSV_PERMISSIONS_PATHS`** 
 
 Required. List/tuple of CSV file names to use for permissions.
+
+Alternately as a shorthand if you only have one CSV file you can instead set
+`CSV_PERMISSIONS_PATH` to that single file.  
 
 **`CSV_PERMISSIONS_RESOLVE_EVALUATORS`**
 

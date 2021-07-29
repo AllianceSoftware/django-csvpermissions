@@ -1,7 +1,10 @@
+from pathlib import Path
+import tempfile
 from typing import Type
 
 from django.apps import AppConfig
 from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Model
 from django.test import override_settings
 from django.test import TestCase
@@ -343,3 +346,42 @@ class CsvParsingTests(TestCase):
             with override_settings(CSV_PERMISSIONS_GET_USER_TYPE=get_user_type):
                 self.assertFalse(user1.has_perm("test_csv_permissions.foo_testmodela"))
                 self.assertTrue(user1.has_perm("test_csv_permissions.bar_testmodela"))
+
+    def test_permission_path_setting(self):
+        csv_data = f"""
+            Model,      App,                  Action,   Is Global,  {USER1_TYPE}, {USER2_TYPE},
+            TestModelA, test_csv_permissions, foo,      yes,        yes,          ,
+        """
+
+        user1 = User1Factory()
+        user2 = User2Factory()
+
+        # these alternate settings should still work:
+        settings = (
+            # (setting_name, func_to_resolve_file_object_to_setting_value, valid)
+            ("CSV_PERMISSIONS_PATH", lambda f: str(f.name), True),
+            ("CSV_PERMISSIONS_PATH", lambda f: Path(f.name), True),
+            ("CSV_PERMISSIONS_PATHS", lambda f: str(f.name), False),
+            ("CSV_PERMISSIONS_PATHS", lambda f: Path(f.name), False),
+            ("CSV_PERMISSIONS_PATHS", lambda f: (str(f.name),), True),
+            ("CSV_PERMISSIONS_PATHS", lambda f: (Path(f.name),), True),
+        )
+
+        for setting_name, setting_value_func, is_valid_setting in settings:
+            with tempfile.NamedTemporaryFile("w") as f:
+                f.writelines(csv_data.strip())
+                f.seek(0)
+
+                setting_value = setting_value_func(f)
+
+                with self.subTest(setting_name=setting_name, setting_value=setting_value):
+                    # we deliberately create a new file each time so that if there's some
+                    # incorrect caching behaviour from previous subtest that it will be caught
+
+                    with override_settings(**{setting_name: setting_value}):
+                        if not is_valid_setting:
+                            with self.assertRaises(ImproperlyConfigured):
+                                csv_permissions.permissions.CSVPermissionsBackend()
+                        else:
+                            self.assertTrue(user1.has_perm("test_csv_permissions.foo_testmodela"))
+                            self.assertFalse(user2.has_perm("test_csv_permissions.foo_testmodela"))
