@@ -297,14 +297,16 @@ from django.db.models import Model
 def resolve_perm_name(app_config: AppConfig, model: Optional[Type[Model]], action: str, is_global: bool) -> str:
     # here's an implementation that is almost the same as django, but
     # uses - as a separator instead of _ and .
-    #
-    # we also need to handle the case where a permission has no associated model
     if model is None:
         return f"{app_config.label}-{action}"
     else:
         return f"{app_config.label}-{action}-{model._meta.model_name}"
 
 ```
+
+Note the handling of the case where a permission has no model.
+Examples of this can be seen in the `report_outstanding` and `report_popularity`
+permissions in the [sample CSV file](#the-csv-file).
 
 
 ### Full Settings Reference
