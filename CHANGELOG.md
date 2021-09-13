@@ -26,7 +26,7 @@ so make sure you follow the template
 
 -->
 
-## 0.2.0.dev0 2021-07-29
+## 0.2.0 2021-09-13
 
 ### Added
 * Add documentation
