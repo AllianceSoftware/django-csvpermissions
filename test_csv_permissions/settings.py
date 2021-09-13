@@ -9,23 +9,12 @@ is_ci = _os.environ.get('CI_SERVER', 'no') == 'yes'
 
 BASE_DIR = _Path(__file__).parent
 
-# Select DB engine
-
-if _strtobool(_os.environ.get('TOX', '0')):
-    _engine = _os.environ['VIRTUAL_ENV'].split('-')[-1]
-    assert _engine
-    _engine = 'django.db.backends.' + _engine
-elif _os.environ.get('PGDATABASE'):
-    _engine = 'django.db.backends.postgresql'
-else:
-    _engine = 'django.db.backends.postgresql'
-
 # DB default settings
 _db_vars = {
     'NAME': ('DB_NAME', 'csv_permissions'),
     'HOST': ('DB_HOST', 'localhost'),
-    'PORT': ('DB_PORT', '5432' if _engine == 'django.db.backends.postgresql' else '3306'),
-    'USER': ('DB_USER', _os.environ.get('USER', '') if _engine == 'django.db.backends.postgresql' else None),
+    'PORT': ('DB_PORT', '5432'),
+    'USER': ('DB_USER', _os.environ.get('USER', '')),
     'PASSWORD': ('DB_PASSWORD', None),
 }
 
@@ -34,17 +23,7 @@ _db_vars = {var: _os.environ.get(env_var, default) for var, (env_var, default) i
 # remove blank settings (no-password is not treated the same as '')
 _db_vars = {key: value for key, value in _db_vars.items() if value}
 
-_db_vars['ENGINE'] = _engine
-
-if _engine == 'django.db.backends.mysql':
-    # extra mysql options
-    _db_vars['OPTIONS'] = {
-        'init_command': 'SET default_storage_engine=INNODB',
-        'charset': 'utf8mb4',
-    }
-    if not is_ci:
-        _db_vars['OPTIONS']['read_default_file'] = '~/.my.cnf'
-
+_db_vars['ENGINE'] = 'django.db.backends.postgresql'
 
 # Django connects via the live DB in order to create/drop the test DB
 # If the live DB doesn't exist then it bails out before even trying to
@@ -58,18 +37,15 @@ DATABASES = {'default': _db_vars}
 
 INSTALLED_APPS = (
     'csv_permissions',
-    'authtools',
 
     'test_csv_permissions',
-
-    'django_db_constraints',
 
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
 )
 
-AUTH_USER_MODEL = 'authtools.User'
+AUTH_USER_MODEL = 'test_csv_permissions.User'
 
 AUTHENTICATION_BACKENDS = [
     "csv_permissions.permissions.CSVPermissionsBackend",

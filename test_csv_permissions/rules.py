@@ -1,3 +1,7 @@
+def testmodela_own(user, obj):
+    return True
+
+
 def testmodela_own_model_a(user, obj):
     return True
 

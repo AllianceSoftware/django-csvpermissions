@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "django_csvpermissions"
-version = "0.1.0"
+version = "0.2.0"
 description = "CSV Based Permissions Module for Django"
 authors = ["Alliance Software <support@alliancesoftware.com.au>"]
 license = "BSD-2-Clause"
@@ -19,12 +19,10 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = ">=3.6,<4.0"
 
-# the only hard dependency is django; everything else is only required
-# if you use functions/classes that require them
+# the only hard dependency is django
 Django = ">=2.2"
-isort = ">=4"
 
 [tool.poetry.dev-dependencies]
 tox = "*"
@@ -32,9 +30,36 @@ tox-factor = "*"
 isort = ">=5"
 Django = "^2.2"
 
-# requirements-tox.ini contains extra
+factory-boy = ">=3"
+# django 2.2 is incompatible with psycopg2 >=2.9
+psycopg2 = "<2.9"
 
+dataclasses = "*; python_version <= 3.6"
 
 [build-system]
-requires = ["poetry-core>=1.0.0a5"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+force_single_line = true
+force_sort_within_sections = true
+line_length = 110
+order_by_type = false
+skip_glob = [
+	"*/.tox/*",
+	"*/node_modules/*.py",
+	"*/migrations/0*.py",
+	"*/settings/*.py",
+]
+# stdlib that may be backported or not always there
+extra_standard_library=[
+	"pkg_resources",
+	"setuptools",
+	"typing",
+]
+
+# packages that we may have made local modifications too or are checked out from github
+known_third_party=[
+    "django"
+]
+#known_first_party=[]
