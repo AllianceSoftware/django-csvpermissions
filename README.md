@@ -384,15 +384,15 @@ Note that due to pip/poetry/distutils issues you can't easily install dev versio
         * On macs this will be stored in the `login` keychain at `poetry-repository-pypi`
 
 #### Publishing a New Release
-    * Update CHANGELOG.md with details of changes and new version
-    * Run `bin/build.py`. This will extract version from CHANGELOG.md, bump version in `pyproject.toml` and generate a build for publishing
-    * Tag with new version and update the version branch:
-        * `ver=$( poetry version --short ) && echo "Version: $ver"`
-        * `git tag v/$ver`
-        * `git push --tags`
-    * To publish to test.pypi.org
-        * `poetry publish --repository testpypi`
-    * To publish to pypi.org
-        * `poetry publish`
+* Update CHANGELOG.md with details of changes and new version
+* Run `bin/build.py`. This will extract version from CHANGELOG.md, bump version in `pyproject.toml` and generate a build for publishing
+* Tag with new version and update the version branch:
+    * `ver=$( poetry version --short ) && echo "Version: $ver"`
+    * `git tag v/$ver`
+    * `git push --tags`
+* To publish to test.pypi.org
+    * `poetry publish --repository testpypi`
+* To publish to pypi.org
+    * `poetry publish`
 
 
