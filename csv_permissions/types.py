@@ -29,6 +29,7 @@ class UnresolvedEvaluator:
     is_global: bool
     permission: PermName
     action: str
+    user_type: str
     evaluator_name: str
     source_csv: Path
 
