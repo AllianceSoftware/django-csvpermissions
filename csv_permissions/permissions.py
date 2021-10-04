@@ -148,6 +148,7 @@ def _parse_csv(
                         is_global=is_global,
                         permission=permission,
                         action=action,
+                        user_type=user_type,
                         evaluator_name=evaluator_name,
                         source_csv=file_path,
                     )
