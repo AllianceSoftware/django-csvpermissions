@@ -26,6 +26,9 @@ so make sure you follow the template
 
 -->
 
+## 0.3.0.dev0 2021-10-04
+* Add `user_type` to `UnresolvedEvaluator`
+
 ## 0.2.0 2021-09-13
 
 ### Added
