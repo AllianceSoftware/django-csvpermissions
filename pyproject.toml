@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "django_csvpermissions"
-version = "0.2.0"
+version = "0.3.0"
 description = "CSV Based Permissions Module for Django"
 authors = ["Alliance Software <support@alliancesoftware.com.au>"]
 license = "BSD-2-Clause"
@@ -24,17 +24,18 @@ python = ">=3.6,<4.0"
 # the only hard dependency is django
 Django = ">=2.2"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 tox = "*"
 tox-factor = "*"
 isort = ">=5"
 Django = "^2.2"
+setuptools = "*"
 
 factory-boy = ">=3"
 # django 2.2 is incompatible with psycopg2 >=2.9
 psycopg2 = "<2.9"
 
-dataclasses = "*; python_version <= 3.6"
+dataclasses = { version = "*", python = "<=3.6" }
 
 [build-system]
 requires = ["poetry-core"]
